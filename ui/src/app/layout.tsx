@@ -17,35 +17,33 @@ export default function RootLayout({
 }) {
   return (
     <html lang="id">
-      <body className={`${bodyFont.variable} antialiased`}>
+      <body className={`${bodyFont.variable} h-screen w-screen overflow-hidden antialiased`}>
         <Providers>
-          <div className="min-h-screen">
-            <div className="mx-auto flex min-h-screen max-w-[1600px]">
-              <aside className="hidden w-72 shrink-0 border-r border-border/90 bg-card lg:flex lg:flex-col">
-                <div className="border-b border-border/80 px-6 py-6">
-                  <span className="inline-flex rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground">
+          <div className="h-screen w-screen overflow-hidden bg-gradient-to-br from-[#EAF4FF] via-[#F0F7FF] to-[#E2EFFF] p-3 lg:p-4">
+            <div className="mx-auto flex h-full max-w-[1700px] gap-3">
+              <aside className="hidden h-full w-72 shrink-0 rounded-3xl border border-white bg-white/70 shadow-xl shadow-blue-900/5 backdrop-blur-xl lg:flex lg:flex-col">
+                <div className="border-b border-white/80 px-6 py-6">
+                  <span className="inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-bold tracking-tight text-sky-700">
                     Dasbor Operasional
                   </span>
-                  <h1 className="mt-4 text-xl font-bold text-foreground">Asisten Spio</h1>
-                  <p className="mt-2 text-sm text-muted-foreground">
+                  <h1 className="mt-4 text-xl font-black tracking-tighter text-slate-900">Asisten Spio</h1>
+                  <p className="mt-2 text-xs text-blue-900/60">
                     Cek status sistem, jalankan tugas, dan lihat hasilnya langsung dari satu tempat.
                   </p>
                 </div>
 
                 <SidebarNav />
 
-                <div className="mt-auto border-t border-border/80 px-6 py-4 text-xs text-muted-foreground">
-                  Versi 0.1.0
-                </div>
+                <div className="mt-auto border-t border-white/80 px-6 py-4 text-xs font-semibold text-blue-900/60">Versi 0.1.0</div>
               </aside>
 
-              <main className="scroll-stable flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-                <div className="mb-6 rounded-2xl border border-border/80 bg-card p-4 lg:hidden">
-                  <h1 className="text-lg font-bold text-foreground">Asisten Spio</h1>
-                  <p className="mt-1 text-sm text-muted-foreground">Pantau sistem dan jalankan tugas dengan cepat</p>
+              <main className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+                <div className="glass-island mb-3 p-4 lg:hidden">
+                  <h1 className="text-lg font-black tracking-tighter text-slate-900">Asisten Spio</h1>
+                  <p className="mt-1 text-xs text-blue-900/60">Pantau sistem dan jalankan tugas dengan cepat</p>
                   <SidebarNav compact />
                 </div>
-                {children}
+                <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
               </main>
             </div>
           </div>
