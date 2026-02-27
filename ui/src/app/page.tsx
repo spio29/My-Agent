@@ -110,6 +110,18 @@ export default function ChairmanDashboard() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [sanitizedChatHistory]);
 
+  useEffect(() => {
+    if (branches.length === 0) {
+      if (activeBranchId !== null) setActiveBranchId(null);
+      return;
+    }
+
+    const stillExists = branches.some((branch) => branch.branch_id === activeBranchId);
+    if (!stillExists) {
+      setActiveBranchId(branches[0].branch_id);
+    }
+  }, [branches, activeBranchId]);
+
   const handleSendMandate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!mandateText.trim()) return;
