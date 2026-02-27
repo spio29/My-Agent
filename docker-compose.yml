@@ -67,6 +67,7 @@ services:
       context: .
       dockerfile: Dockerfile.worker
     container_name: spio-connector
+    command: ["python", "-m", "app.services.connector.main"]
     env_file: .env
     environment:
       - AGENT_POOL=connector
