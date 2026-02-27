@@ -1,0 +1,72 @@
+[
+  {
+    "id": "monitor-telegram-5m",
+    "prompt": "monitor telegram account_id bot_a01 setiap 5 menit",
+    "expected_job_types": ["monitor.channel"],
+    "default_channel": "telegram",
+    "default_account_id": "bot_a01"
+  },
+  {
+    "id": "monitor-whatsapp-2m",
+    "prompt": "pantau whatsapp account_id sales_01 tiap 2 menit",
+    "expected_job_types": ["monitor.channel"],
+    "default_channel": "telegram",
+    "default_account_id": "bot_a01"
+  },
+  {
+    "id": "report-daily-0700",
+    "prompt": "buat laporan harian jam 07:00",
+    "expected_job_types": ["report.daily"],
+    "default_channel": "telegram",
+    "default_account_id": "bot_a01"
+  },
+  {
+    "id": "backup-daily-0200",
+    "prompt": "backup export data harian jam 02:00",
+    "expected_job_types": ["backup.export"],
+    "default_channel": "telegram",
+    "default_account_id": "bot_a01"
+  },
+  {
+    "id": "agent-workflow-github-notion",
+    "prompt": "otomasi sinkron github ke notion tiap hari",
+    "expected_job_types": ["agent.workflow"],
+    "default_channel": "telegram",
+    "default_account_id": "bot_a01"
+  },
+  {
+    "id": "monitor-and-report",
+    "prompt": "monitor telegram account_id bot_a01 tiap 1 menit dan kirim laporan harian jam 08:00",
+    "expected_job_types": ["monitor.channel", "report.daily"],
+    "default_channel": "telegram",
+    "default_account_id": "bot_a01"
+  },
+  {
+    "id": "monitor-and-backup",
+    "prompt": "cek heartbeat koneksi telegram bot_a01 tiap 30 detik lalu backup setiap hari jam 01:30",
+    "expected_job_types": ["monitor.channel", "backup.export"],
+    "default_channel": "telegram",
+    "default_account_id": "bot_a01"
+  },
+  {
+    "id": "mcp-agent",
+    "prompt": "jalankan workflow integrasi mcp linear notion untuk sinkron tugas",
+    "expected_job_types": ["agent.workflow"],
+    "default_channel": "telegram",
+    "default_account_id": "bot_a01"
+  },
+  {
+    "id": "report-interval-hourly",
+    "prompt": "buat ringkasan report tiap 1 jam",
+    "expected_job_types": ["report.daily"],
+    "default_channel": "telegram",
+    "default_account_id": "bot_a01"
+  },
+  {
+    "id": "backup-default-time",
+    "prompt": "tolong backup data rutin",
+    "expected_job_types": ["backup.export"],
+    "default_channel": "telegram",
+    "default_account_id": "bot_a01"
+  }
+]
