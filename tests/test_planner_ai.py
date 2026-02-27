@@ -253,6 +253,8 @@ def test_build_plan_with_ai_timeout_keeps_slot_busy_until_worker_done(monkeypatc
     monkeypatch.setenv("PLANNER_AI_TIMEOUT_SEC", "0.1")
     monkeypatch.setenv("PLANNER_AI_MAX_CONCURRENT", "1")
     monkeypatch.setenv("PLANNER_AI_QUEUE_WAIT_SEC", "0.05")
+    monkeypatch.setattr(planner_ai, "_planner_ai_timeout_sec", lambda: 0.1)
+    monkeypatch.setattr(planner_ai, "_planner_ai_release_grace_sec", lambda: 0.4)
 
     _reset_planner_ai_limiter_state()
     request = PlannerAiRequest(prompt="monitor telegram account_id bot_a01 setiap 5 menit")
