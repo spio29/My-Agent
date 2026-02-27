@@ -41,6 +41,13 @@ const formatCurrency = (val: number) => {
   }).format(val);
 };
 
+const sanitizeBoardroomText = (text: string) => {
+  return text
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+};
+
 export default function ChairmanDashboard() {
   const queryClient = useQueryClient();
   const [activeBranchId, setActiveBranchId] = useState<string | null>(null);
@@ -85,14 +92,23 @@ export default function ChairmanDashboard() {
     branches.find(b => b.branch_id === activeBranchId)
   , [branches, activeBranchId]);
 
+  const sanitizedChatHistory = useMemo(() => 
+    chatHistory
+      .map((msg) => {
+        const cleanedText = msg.sender === "CEO" ? sanitizeBoardroomText(msg.text) : msg.text.trim();
+        return { ...msg, text: cleanedText };
+      })
+      .filter((msg) => msg.text.length > 0)
+  , [chatHistory]);
+
   const latestCeoMessage = useMemo(() => {
-    const ceoMsgs = [...chatHistory].reverse().filter(m => m.sender === "CEO");
+    const ceoMsgs = [...sanitizedChatHistory].reverse().filter(m => m.sender === "CEO");
     return ceoMsgs[0]?.text || "Menunggu laporan pertama dari CEO...";
-  }, [chatHistory]);
+  }, [sanitizedChatHistory]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatHistory]);
+  }, [sanitizedChatHistory]);
 
   const handleSendMandate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -245,7 +261,7 @@ export default function ChairmanDashboard() {
               </div>
             </CardHeader>
             <CardContent className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-              {chatHistory.map((msg) => (
+              {sanitizedChatHistory.map((msg) => (
                 <div key={msg.id} className={`flex ${msg.sender === "Chairman" ? "justify-end" : "justify-start"}`}>
                   <div className={`max-w-[90%] rounded-3xl p-4 text-sm shadow-sm ${
                     msg.sender === "Chairman" 
