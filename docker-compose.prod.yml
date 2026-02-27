@@ -42,6 +42,7 @@ services:
       - SCHEDULER_PRESSURE_DEPTH_LOW=${SCHEDULER_PRESSURE_DEPTH_LOW:-180}
       - LOCAL_AI_URL=${LOCAL_AI_URL:-http://host.docker.internal:11434/v1}
       - PLANNER_AI_MODEL=${PLANNER_AI_MODEL:-llama3}
+      - PLANNER_AI_TIMEOUT_SEC=${PLANNER_AI_TIMEOUT_SEC:-15}
       - AI_NODE_URL=${AI_NODE_URL:-}
       - AI_NODE_SECRET=${AI_NODE_SECRET:-factory-secret-123}
       - AUTH_ENABLED=${AUTH_ENABLED:-false}
@@ -118,6 +119,7 @@ services:
       - WORKER_CONCURRENCY=${WORKER_CONCURRENCY:-5}
       - LOCAL_AI_URL=${LOCAL_AI_URL:-http://host.docker.internal:11434/v1}
       - PLANNER_AI_MODEL=${PLANNER_AI_MODEL:-llama3}
+      - PLANNER_AI_TIMEOUT_SEC=${PLANNER_AI_TIMEOUT_SEC:-15}
       - AI_NODE_URL=${AI_NODE_URL:-}
       - AI_NODE_SECRET=${AI_NODE_SECRET:-factory-secret-123}
       - TELEGRAM_NOTIF_TOKEN=${TELEGRAM_NOTIF_TOKEN:-}
@@ -186,6 +188,7 @@ services:
       - REDIS_DB=0
       - LOCAL_AI_URL=${LOCAL_AI_URL:-http://host.docker.internal:11434/v1}
       - PLANNER_AI_MODEL=${PLANNER_AI_MODEL:-llama3}
+      - PLANNER_AI_TIMEOUT_SEC=${PLANNER_AI_TIMEOUT_SEC:-15}
       - AI_NODE_URL=${AI_NODE_URL:-}
       - AI_NODE_SECRET=${AI_NODE_SECRET:-factory-secret-123}
       - TELEGRAM_NOTIF_TOKEN=${TELEGRAM_NOTIF_TOKEN:-}
