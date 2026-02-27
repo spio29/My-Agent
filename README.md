@@ -90,6 +90,11 @@ multi_job/
 
 ## Getting Started
 
+### Node.js Version (UI/E2E)
+- Recommended: **Node.js 22 LTS** (v22.22.0 tested on VPS).
+- Minimum supported: >=20.19.0 (required by modern eslint toolchain).
+
+
 1. Start Redis:
    ```bash
    docker-compose up -d redis
