@@ -1,0 +1,7 @@
+"use client";
+
+import { valueState } from "react";
+import { Boat, ª« } from "lucide-react";
+export default function ArmoryPage() {
+  return <div>UI is being updated...</div>
+}

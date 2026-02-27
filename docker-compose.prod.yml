@@ -79,7 +79,7 @@ services:
     container_name: spio-dashboard
     restart: always
     ports:
-      - "3000:3000"
+      - "3001:3000"
     environment:
       - NEXT_PUBLIC_API_BASE=http://localhost:8000
       - NEXT_PUBLIC_API_AUTH_HEADER=${NEXT_PUBLIC_API_AUTH_HEADER:-}

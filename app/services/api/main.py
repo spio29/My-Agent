@@ -2344,3 +2344,22 @@ async def api_system_infrastructure():
         },
         "timestamp": time.time()
     }
+class MemoryEntry(BaseModel):
+    key: str
+    value: str
+
+@app.get("/memory")
+async def api_list_memory():
+    from app.core.redis_client import redis_client
+    keys = await redis_client.keys("memory:context:*")
+    results = []
+    for k in keys:
+        v = await redis_client.get(k)
+        results.append({"key": k.replace("memory:context:", ""), "value": v})
+    return results
+
+@app.post("/memory")
+async def api_save_memory(mem: MemoryEntry):
+    from app.core.redis_client import redis_client
+    await redis_client.set(f"memory:context:{mem.key}", mem.value)
+    return {"status": "saved"}

@@ -1,85 +1,77 @@
 version: '3.8'
-
 services:
-  # 1. PUSAT ANTREAN & MEMORI: Redis
   redis:
     image: redis:7-alpine
     container_name: spio-redis
     ports:
-      - "6379:6379"
+      - 6379:6379
     volumes:
       - redis-data:/data
     command: redis-server --appendonly yes
     restart: always
-
-  # 2. MOTHER-SHIP: API
   api:
     build:
       context: .
       dockerfile: Dockerfile.api
     container_name: spio-api
     ports:
-      - "8000:8000"
+      - 8000:8000
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - host.docker.internal:host-gateway
+    env_file: .env
     environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - LOCAL_AI_URL=${LOCAL_AI_URL}
-      - PLANNER_AI_MODEL=${PLANNER_AI_MODEL}
-      - ARMORY_MASTER_KEY=${ARMORY_MASTER_KEY}
-    depends_on:
-      - redis
+      - CORS_ALLOW_ORIGINS=*
+    depends_on: [redis]
     restart: always
-
-  # 3. MOTHER-SHIP: DASHBOARD UI
   ui:
     build:
       context: ./ui
       dockerfile: Dockerfile.ui
     container_name: spio-dashboard
     ports:
-      - "3001:3000"
+      - 3001:3000
+    env_file: .env
     environment:
-      - NEXT_PUBLIC_API_BASE=http://localhost:8000
-    depends_on:
-      - api
+      - NEXT_PUBLIC_API_BASE=http://213.163.193.6:8000
+    depends_on: [api]
     restart: always
-
-  # 4. UNIT BISNIS TEMPLATE
   unit-agency:
     build:
       context: .
       dockerfile: Dockerfile.worker
     container_name: spio-unit-agency
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    env_file: .env
     environment:
       - AGENT_POOL=agency
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - LOCAL_AI_URL=${LOCAL_AI_URL}
-      - AI_NODE_URL=${AI_NODE_URL}
-      - TELEGRAM_NOTIF_TOKEN=${TELEGRAM_NOTIF_TOKEN}
-      - TELEGRAM_NOTIF_CHAT_ID=${TELEGRAM_NOTIF_CHAT_ID}
-    depends_on:
-      - redis
-      - api
+    depends_on: [redis, api]
     restart: always
-
-  # 5. SYSTEM SCHEDULER
   scheduler:
     build:
       context: .
       dockerfile: Dockerfile.scheduler
     container_name: spio-scheduler
-    environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-    depends_on:
-      - redis
-      - api
+    env_file: .env
+    depends_on: [redis, api]
     restart: always
-
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: spio-worker
+    env_file: .env
+    environment:
+      - AGENT_POOL=global
+    depends_on: [redis, api]
+    restart: always
+  connector:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: spio-connector
+    env_file: .env
+    environment:
+      - AGENT_POOL=connector
+    depends_on: [redis, api]
+    restart: always
 volumes:
   redis-data:

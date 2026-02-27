@@ -213,7 +213,7 @@ export interface AgentMemoryEpisodic {
   timestamp: string;
   type: string;
   description: string;
-  context: Record<string, unknown>;
+  constext: Record<string, unknown>;
 }
 
 export interface AgentMemorySummary {
@@ -1108,7 +1108,7 @@ export const getAuditLogs = async (params?: {
   method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
   outcome?: "success" | "error" | "denied";
   actor_role?: "viewer" | "operator" | "admin" | "unknown";
-  path_contains?: string;
+  path_constains?: string;
 }): Promise<AuditLog[]> => {
   try {
     const queryParams = new URLSearchParams();
@@ -1117,7 +1117,7 @@ export const getAuditLogs = async (params?: {
     if (params?.method) queryParams.append("method", params.method);
     if (params?.outcome) queryParams.append("outcome", params.outcome);
     if (params?.actor_role) queryParams.append("actor_role", params.actor_role);
-    if (params?.path_contains) queryParams.append("path_contains", params.path_contains);
+    if (params?.path_constains) queryParams.append("path_constains", params.path_constains);
     const path = `/audit/logs${queryParams.size ? `?${queryParams.toString()}` : ""}`;
     return await getJson<AuditLog[]>(path);
   } catch (error) {
@@ -1268,3 +1268,5 @@ export const getSystemInfrastructure = async (): Promise<any> => {
 export const executePlannerPrompt = async (payload: PlannerExecuteRequest): Promise<PlannerExecuteResponse> => {
   return await send<PlannerExecuteResponse>("/planner/execute", "POST", payload);
 };
+export const getMemory = async () => fetch("http://213.163.193.6:8000/memory").then(r => r.json());
+export const saveMemory = async (data: any) => fetch("http://213.163.193.6:8000/memory", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data)}).then(r => r.json());
