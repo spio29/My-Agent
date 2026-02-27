@@ -85,6 +85,14 @@ def _planner_ai_queue_wait_sec() -> float:
         return 1.5
 
 
+def _planner_ai_release_grace_sec() -> float:
+    raw = str(os.getenv("PLANNER_AI_RELEASE_GRACE_SEC") or "30").strip()
+    try:
+        return max(5.0, min(600.0, float(raw)))
+    except Exception:
+        return 30.0
+
+
 def _get_planner_ai_semaphore() -> Tuple[asyncio.Semaphore, int]:
     global _PLANNER_AI_SEMAPHORE, _PLANNER_AI_SEMAPHORE_SIZE
     size = _planner_ai_max_concurrent()
@@ -92,6 +100,24 @@ def _get_planner_ai_semaphore() -> Tuple[asyncio.Semaphore, int]:
         _PLANNER_AI_SEMAPHORE = asyncio.Semaphore(size)
         _PLANNER_AI_SEMAPHORE_SIZE = size
     return _PLANNER_AI_SEMAPHORE, size
+
+
+def _defer_semaphore_release(
+    worker_task: "asyncio.Task[Any]",
+    semaphore: asyncio.Semaphore,
+    grace_sec: float,
+) -> None:
+    async def _wait_and_release() -> None:
+        try:
+            await asyncio.wait_for(asyncio.shield(worker_task), timeout=grace_sec)
+        except Exception:
+            pass
+        finally:
+            # Jika task backend menggantung terlalu lama, slot tetap dilepas setelah grace
+            # agar sistem tidak terkunci permanen di mode "busy".
+            semaphore.release()
+
+    asyncio.create_task(_wait_and_release())
 
 
 def _normalisasi_teks(text: str) -> str:
@@ -739,6 +765,7 @@ async def build_plan_with_ai_dari_dashboard(request: PlannerAiRequest) -> Planne
 
     timeout_sec = _planner_ai_timeout_sec()
     queue_wait_sec = _planner_ai_queue_wait_sec()
+    release_grace_sec = _planner_ai_release_grace_sec()
     semaphore, max_concurrent = _get_planner_ai_semaphore()
 
     try:
@@ -756,6 +783,7 @@ async def build_plan_with_ai_dari_dashboard(request: PlannerAiRequest) -> Planne
         )
         return fallback_plan
 
+    release_on_exit = True
     try:
         for index, kredensial in enumerate(kandidat, start=1):
             warning_konteks = _hapus_duplikat(
@@ -765,26 +793,40 @@ async def build_plan_with_ai_dari_dashboard(request: PlannerAiRequest) -> Planne
                 ]
             )
 
+            worker_task: asyncio.Task[Any] = asyncio.create_task(
+                asyncio.to_thread(
+                    _jalankan_smolagents,
+                    request,
+                    model_id_override=kredensial.model_id,
+                    api_key_override=kredensial.api_key,
+                    api_base_override=kredensial.api_base,
+                )
+            )
             try:
                 payload, warnings_ai = await asyncio.wait_for(
-                    asyncio.to_thread(
-                        _jalankan_smolagents,
-                        request,
-                        model_id_override=kredensial.model_id,
-                        api_key_override=kredensial.api_key,
-                        api_base_override=kredensial.api_base,
-                    ),
+                    asyncio.shield(worker_task),
                     timeout=float(timeout_sec),
                 )
             except asyncio.TimeoutError:
-                payload, warnings_ai = (
-                    None,
+                # Worker thread tidak bisa dipaksa stop segera. Tahan slot concurrency
+                # sampai task background benar-benar selesai agar tidak terjadi snowball.
+                _defer_semaphore_release(worker_task, semaphore, release_grace_sec)
+                release_on_exit = False
+                warning_terkumpul = _hapus_duplikat(
                     [
-                        f"Planner AI timeout di {kredensial.provider}/{kredensial.account_id} "
-                        f"setelah {timeout_sec} detik."
-                    ],
+                        *warning_konteks,
+                        (
+                            f"Planner AI timeout di {kredensial.provider}/{kredensial.account_id} "
+                            f"setelah {timeout_sec} detik."
+                        ),
+                        f"Planner AI gagal di {kredensial.provider}/{kredensial.account_id}.",
+                        "Sisa provider dilewati untuk mencegah bottleneck berantai.",
+                    ]
                 )
+                break
             except Exception as exc:
+                if not worker_task.done():
+                    worker_task.cancel()
                 payload, warnings_ai = None, [
                     f"Planner AI error di {kredensial.provider}/{kredensial.account_id}: {exc}"
                 ]
@@ -822,4 +864,5 @@ async def build_plan_with_ai_dari_dashboard(request: PlannerAiRequest) -> Planne
         )
         return fallback_plan
     finally:
-        semaphore.release()
+        if release_on_exit:
+            semaphore.release()

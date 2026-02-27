@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 from app.services.api import planner_ai
 from app.services.api.planner_ai import (
@@ -190,3 +191,91 @@ def test_resolve_planner_ai_candidates_auto_falls_back_to_ollama(monkeypatch):
     assert kandidat[0].provider == "ollama"
     assert kandidat[0].model_id.startswith("ollama/")
     assert any("OpenAI" in item for item in warnings)
+
+
+
+def _reset_planner_ai_limiter_state() -> None:
+    planner_ai._PLANNER_AI_SEMAPHORE = None
+    planner_ai._PLANNER_AI_SEMAPHORE_SIZE = 0
+
+
+def test_build_plan_with_ai_falls_back_when_planner_busy(monkeypatch):
+    async def fake_resolve_candidates(_request):
+        return [
+            planner_ai.PlannerAiCredentials(
+                provider="ollama",
+                account_id="default",
+                model_id="ollama/qwen2.5:0.5b",
+                api_key="ollama",
+                api_base="http://localhost:11434",
+            )
+        ], []
+
+    monkeypatch.setattr(planner_ai, "resolve_planner_ai_credential_candidates", fake_resolve_candidates)
+    monkeypatch.setenv("PLANNER_AI_MAX_CONCURRENT", "1")
+    monkeypatch.setenv("PLANNER_AI_QUEUE_WAIT_SEC", "0.1")
+
+    _reset_planner_ai_limiter_state()
+    sem = asyncio.Semaphore(1)
+    asyncio.run(sem.acquire())
+    planner_ai._PLANNER_AI_SEMAPHORE = sem
+    planner_ai._PLANNER_AI_SEMAPHORE_SIZE = 1
+
+    request = PlannerAiRequest(prompt="monitor telegram account_id bot_a01 setiap 5 menit")
+    try:
+        plan = asyncio.run(planner_ai.build_plan_with_ai_dari_dashboard(request))
+    finally:
+        sem.release()
+        _reset_planner_ai_limiter_state()
+
+    assert plan.planner_source == "rule_based"
+    assert any("sedang sibuk" in item for item in plan.warnings)
+
+
+def test_build_plan_with_ai_timeout_keeps_slot_busy_until_worker_done(monkeypatch):
+    async def fake_resolve_candidates(_request):
+        return [
+            planner_ai.PlannerAiCredentials(
+                provider="ollama",
+                account_id="default",
+                model_id="ollama/qwen2.5:0.5b",
+                api_key="ollama",
+                api_base="http://localhost:11434",
+            )
+        ], []
+
+    def fake_jalankan(*_args, **_kwargs):
+        time.sleep(0.35)
+        return None, ["mock slow response"]
+
+    monkeypatch.setattr(planner_ai, "resolve_planner_ai_credential_candidates", fake_resolve_candidates)
+    monkeypatch.setattr(planner_ai, "_jalankan_smolagents", fake_jalankan)
+    monkeypatch.setenv("PLANNER_AI_TIMEOUT_SEC", "0.1")
+    monkeypatch.setenv("PLANNER_AI_MAX_CONCURRENT", "1")
+    monkeypatch.setenv("PLANNER_AI_QUEUE_WAIT_SEC", "0.05")
+
+    _reset_planner_ai_limiter_state()
+    request = PlannerAiRequest(prompt="monitor telegram account_id bot_a01 setiap 5 menit")
+
+    async def run_scenario():
+        first = asyncio.create_task(planner_ai.build_plan_with_ai_dari_dashboard(request))
+        await asyncio.sleep(0.15)
+
+        start = time.perf_counter()
+        second = await planner_ai.build_plan_with_ai_dari_dashboard(request)
+        second_latency = time.perf_counter() - start
+
+        first_result = await first
+        return first_result, second, second_latency
+
+    try:
+        first_result, second_result, second_latency = asyncio.run(run_scenario())
+    finally:
+        _reset_planner_ai_limiter_state()
+
+    assert first_result.planner_source == "rule_based"
+    assert any("timeout" in item.lower() for item in first_result.warnings)
+
+    assert second_result.planner_source == "rule_based"
+    assert any("sedang sibuk" in item for item in second_result.warnings)
+    assert second_latency < 0.25
