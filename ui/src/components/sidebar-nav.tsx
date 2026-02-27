@@ -6,11 +6,11 @@ import { Brain, Gauge, Settings2, ShieldCheck, Sword } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/", label: "Holding Suite", icon: Gauge },
-  { href: "/memory", label: "Memory Vault", icon: Brain },
-  { href: "/armory", label: "The Armory", icon: Sword },
-  { href: "/automation", label: "Branch Manager", icon: ShieldCheck },
-  { href: "/settings", label: "HoldCo Control", icon: Settings2 },
+  { href: "/", label: "Home", icon: Gauge },
+  { href: "/memory", label: "Memory", icon: Brain },
+  { href: "/armory", label: "Armory", icon: Sword },
+  { href: "/automation", label: "Branch", icon: ShieldCheck },
+  { href: "/settings", label: "Control", icon: Settings2 },
 ];
 
 export default function SidebarNav({ compact = false }) {
@@ -20,7 +20,7 @@ export default function SidebarNav({ compact = false }) {
     cn(
       "flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-sm font-bold tracking-tight transition-colors",
       pathname === href
-        ? "border-sky-200/80 bg-sky-100 text-sky-700"
+        ? "border-[#42A5F5]/40 bg-[#42A5F5]/20 text-[#1F5D93]"
         : "border-transparent text-blue-900/60 hover:border-white hover:bg-white/70 hover:text-slate-900",
     );
 

@@ -19,28 +19,33 @@ export default function RootLayout({
     <html lang="id">
       <body className={`${bodyFont.variable} h-screen w-screen overflow-hidden antialiased`}>
         <Providers>
-          <div className="h-screen w-screen overflow-hidden bg-gradient-to-br from-[#EAF4FF] via-[#F0F7FF] to-[#E2EFFF] p-3 lg:p-4">
-            <div className="mx-auto flex h-full max-w-[1700px] gap-3">
-              <aside className="hidden h-full w-72 shrink-0 rounded-3xl border border-white bg-white/70 shadow-xl shadow-blue-900/5 backdrop-blur-xl lg:flex lg:flex-col">
-                <div className="border-b border-white/80 px-6 py-6">
-                  <span className="inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-bold tracking-tight text-sky-700">
-                    Dasbor Operasional
+          <div className="relative h-screen w-screen overflow-hidden bg-gradient-to-br from-[#EAF4FF] via-[#F0F7FF] to-[#E2EFFF] p-3 lg:p-4">
+            <div className="pointer-events-none absolute inset-0 overflow-hidden">
+              <div className="absolute -left-24 -top-20 h-80 w-[32rem] rounded-[42%_58%_63%_37%/44%_41%_59%_56%] bg-[#B9DBFF]/55 blur-3xl" />
+              <div className="absolute right-[-6rem] top-[6%] h-72 w-[28rem] rounded-[56%_44%_40%_60%/53%_45%_55%_47%] bg-[#BFF5E6]/60 blur-3xl" />
+              <div className="absolute left-[30%] top-[58%] h-72 w-[34rem] rounded-[45%_55%_64%_36%/39%_53%_47%_61%] bg-[#FFF9C4]/65 blur-3xl" />
+              <div className="absolute right-[18%] bottom-[-6rem] h-80 w-[30rem] rounded-[60%_40%_58%_42%/52%_47%_53%_48%] bg-[#CDEBFF]/55 blur-3xl" />
+            </div>
+
+            <div className="relative mx-auto flex h-full max-w-[1720px] gap-3">
+              <aside className="hidden h-full w-72 shrink-0 glass-island lg:flex lg:flex-col">
+                <div className="border-b border-white/80 px-5 py-5">
+                  <span className="inline-flex rounded-2xl bg-[#42A5F5]/22 px-3 py-1 text-xs font-bold tracking-tight text-[#1F5D93]">
+                    Holding
                   </span>
-                  <h1 className="mt-4 text-xl font-black tracking-tighter text-slate-900">Asisten Spio</h1>
-                  <p className="mt-2 text-xs text-blue-900/60">
-                    Cek status sistem, jalankan tugas, dan lihat hasilnya langsung dari satu tempat.
-                  </p>
+                  <h1 className="mt-3 text-xl font-black tracking-tighter text-slate-900">Spio</h1>
+                  <p className="mt-1 text-xs text-blue-900/60">Kontrol ringkas.</p>
                 </div>
 
                 <SidebarNav />
 
-                <div className="mt-auto border-t border-white/80 px-6 py-4 text-xs font-semibold text-blue-900/60">Versi 0.1.0</div>
+                <div className="mt-auto border-t border-white/80 px-5 py-4 text-xs font-semibold text-blue-900/60">v0.1.0</div>
               </aside>
 
               <main className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
                 <div className="glass-island mb-3 p-4 lg:hidden">
-                  <h1 className="text-lg font-black tracking-tighter text-slate-900">Asisten Spio</h1>
-                  <p className="mt-1 text-xs text-blue-900/60">Pantau sistem dan jalankan tugas dengan cepat</p>
+                  <h1 className="text-lg font-black tracking-tighter text-slate-900">Spio</h1>
+                  <p className="mt-1 text-xs text-blue-900/60">Kontrol.</p>
                   <SidebarNav compact />
                 </div>
                 <div className="min-h-0 flex-1 overflow-hidden">{children}</div>

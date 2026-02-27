@@ -5,21 +5,24 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-xl text-sm font-semibold ring-offset-background transition-[border-color,background-color,color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center whitespace-nowrap rounded-2xl text-sm font-bold tracking-tight ring-offset-background transition-[border-color,background-color,color,box-shadow,transform] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
-        default: "border border-slate-900 bg-slate-900 text-white shadow-sm hover:bg-slate-800",
+        default:
+          "border border-[#42A5F5]/45 bg-[#42A5F5] text-white shadow-xl shadow-[#42A5F5]/35 hover:-translate-y-0.5 hover:bg-[#3b9be8]",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline: "border border-slate-200/80 bg-white text-slate-700 shadow-sm hover:bg-slate-50",
-        secondary: "border border-slate-200/80 bg-slate-100 text-slate-700 shadow-sm hover:bg-slate-200",
-        ghost: "text-slate-500 hover:bg-slate-100 hover:text-slate-900",
-        link: "text-slate-900 underline-offset-4 hover:underline",
+        outline:
+          "border border-[#42A5F5]/30 bg-[#42A5F5]/14 text-[#1F5D93] shadow-lg shadow-[#42A5F5]/20 hover:bg-[#42A5F5]/24",
+        secondary:
+          "border border-[#42A5F5]/22 bg-white/70 text-slate-900 shadow-lg shadow-blue-900/10 hover:bg-white/90",
+        ghost: "text-blue-900/60 hover:bg-[#42A5F5]/14 hover:text-slate-900",
+        link: "text-[#1F5D93] underline-offset-4 hover:underline",
       },
       size: {
         default: "h-10 px-4 py-2",
-        sm: "h-9 rounded-lg px-3",
-        lg: "h-11 rounded-lg px-8",
+        sm: "h-9 rounded-xl px-3",
+        lg: "h-11 rounded-xl px-8",
         icon: "h-10 w-10",
       },
     },

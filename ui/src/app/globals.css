@@ -10,7 +10,7 @@
   --card-foreground: 222 47% 11%;
   --popover: 0 0% 100%;
   --popover-foreground: 222 47% 11%;
-  --primary: 199 89% 48%;
+  --primary: 207 88% 62%;
   --primary-foreground: 0 0% 100%;
   --secondary: 210 100% 96%;
   --secondary-foreground: 222 47% 11%;
@@ -22,7 +22,7 @@
   --destructive-foreground: 0 0% 100%;
   --border: 0 0% 100%;
   --input: 216 34% 92%;
-  --ring: 199 89% 48%;
+  --ring: 207 88% 62%;
 }
 
 * {
@@ -39,7 +39,7 @@ body {
 body {
   margin: 0;
   font-family: var(--font-body), "Plus Jakarta Sans", "Segoe UI", sans-serif;
-  line-height: 1.45;
+  line-height: 1.4;
   background: transparent;
   color: hsl(var(--foreground));
 }
@@ -52,7 +52,7 @@ h5,
 h6,
 .ui-heading {
   font-family: var(--font-body), "Plus Jakarta Sans", "Segoe UI", sans-serif;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.05em;
   font-weight: 900;
   color: rgb(15 23 42);
 }
@@ -88,7 +88,7 @@ a {
 
 @layer utilities {
   .glass-island {
-    @apply rounded-3xl border border-white bg-white/70 shadow-xl shadow-blue-900/5 backdrop-blur-xl;
+    @apply rounded-3xl border border-white bg-white/70 shadow-xl shadow-blue-900/5 backdrop-blur-xl ring-1 ring-[#42A5F5]/20;
   }
 
   .metric-card-hover {
@@ -113,18 +113,14 @@ a {
   }
 
   .ux-surface:hover {
-    box-shadow: 0 18px 32px -26px rgba(30, 64, 175, 0.28);
+    box-shadow: 0 18px 32px -26px rgba(66, 165, 245, 0.4);
   }
 
   .metric-number {
     font-variant-numeric: tabular-nums;
     font-weight: 900;
-    letter-spacing: -0.05em;
+    letter-spacing: -0.06em;
     color: rgb(15 23 42);
-  }
-
-  .sub-label {
-    @apply text-[11px] font-semibold text-blue-900/60;
   }
 
   .no-scrollbar {
