@@ -99,19 +99,19 @@ npm ci
 Start:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\start-local.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\testing\start-local.ps1
 ```
 
 Cek status:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\status-local.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\testing\status-local.ps1
 ```
 
 Stop:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\stop-local.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\testing\stop-local.ps1
 ```
 
 Log runtime ada di folder `runtime-logs/`.
@@ -280,7 +280,7 @@ Trigger:
 Contoh:
 
 ```bash
-python .\simulate_safe_load.py --jobs 100 --interval-sec 30 --work-ms 8000 --jitter-sec 25 --duration-sec 60 --cleanup
+python .\scripts\testing\simulate_safe_load.py --jobs 100 --interval-sec 30 --work-ms 8000 --jitter-sec 25 --duration-sec 60 --cleanup
 ```
 
 Interpretasi cepat:
@@ -428,9 +428,9 @@ Penjelasan:
 
 | Tujuan | Windows (PowerShell) | Hasil Normal | Jika Tidak Normal |
 | --- | --- | --- | --- |
-| Start stack lokal | `powershell -ExecutionPolicy Bypass -File .\\start-local.ps1` | Semua service `Ya` di status | Jalankan stop, bersihkan port conflict, start ulang |
-| Cek status stack | `powershell -ExecutionPolicy Bypass -File .\\status-local.ps1` | API/UI `200`, error log minim | Buka log service terkait (api/worker/scheduler/ui) |
-| Stop stack | `powershell -ExecutionPolicy Bypass -File .\\stop-local.ps1` | Semua pid berhenti | Stop manual proses yang tersisa |
+| Start stack lokal | `powershell -ExecutionPolicy Bypass -File .\\scripts\\testing\\start-local.ps1` | Semua service `Ya` di status | Jalankan stop, bersihkan port conflict, start ulang |
+| Cek status stack | `powershell -ExecutionPolicy Bypass -File .\\scripts\\testing\\status-local.ps1` | API/UI `200`, error log minim | Buka log service terkait (api/worker/scheduler/ui) |
+| Stop stack | `powershell -ExecutionPolicy Bypass -File .\\scripts\\testing\\stop-local.ps1` | Semua pid berhenti | Stop manual proses yang tersisa |
 | Unit test backend | `.\\.venv\\Scripts\\python.exe -m pytest -q` | Semua test pass | Perbaiki test gagal sebelum lanjut |
 | E2E UI | `cd ui; $env:CI='1'; npm run e2e` | `7 passed` (atau sesuai total test) | Cek log webServer + artifact playwright |
 | Audit UI | `cd ui; npm audit --audit-level=high` | `found 0 vulnerabilities` | Upgrade package rentan dan re-test |
@@ -498,7 +498,7 @@ Setelah rilis:
 - Root ringkas: [README.md](../README.md)
 - Workflow CI E2E: [ui-e2e.yml](../.github/workflows/ui-e2e.yml)
 - Workflow Load test: [load-simulation.yml](../.github/workflows/load-simulation.yml)
-- Script load: [simulate_safe_load.py](../simulate_safe_load.py)
+- Script load: [simulate_safe_load.py](../scripts/testing/simulate_safe_load.py)
 - Checklist harian ops: [CHECKLIST_OPERASIONAL_HARIAN.md](./CHECKLIST_OPERASIONAL_HARIAN.md)
 - Template insiden: [TEMPLATE_INSIDEN_POSTMORTEM.md](./TEMPLATE_INSIDEN_POSTMORTEM.md)
 - FAQ operasional: [FAQ_OPERASIONAL.md](./FAQ_OPERASIONAL.md)

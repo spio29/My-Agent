@@ -14,8 +14,8 @@ A scalable job processing platform built with Python and Redis.
 
 ## Deployment & Production
 
-- Panduan deployment VPS lengkap: [DEPLOYMENT_VPS.md](DEPLOYMENT_VPS.md)
-- Checklist pre-deployment: [CHECKLIST_DEPLOYMENT.md](CHECKLIST_DEPLOYMENT.md)
+- Panduan deployment VPS lengkap: [DEPLOYMENT_VPS.md](docs/DEPLOYMENT_VPS.md)
+- Checklist pre-deployment: [CHECKLIST_DEPLOYMENT.md](docs/CHECKLIST_DEPLOYMENT.md)
 - Setup script otomatis: [scripts/setup-vps.sh](scripts/setup-vps.sh)
 - Quick deploy script: [scripts/deploy.sh](scripts/deploy.sh)
 - Production docker-compose: [docker-compose.prod.yml](docker-compose.prod.yml)
@@ -117,25 +117,25 @@ multi_job/
 
 Quick Windows launcher:
 ```bat
-start-local.cmd
+scripts\testing\start-local.cmd
 ```
 This opens 5 windows (API, worker, scheduler, connector, UI).  
 To stop:
 ```bat
-stop-local.cmd
+scripts\testing\stop-local.cmd
 ```
 
 Alternative launcher with health check + PID/log tracking (recommended):
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\start-local.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\testing\start-local.ps1
 ```
 Check status:
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\status-local.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\testing\status-local.ps1
 ```
 Stop all:
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\stop-local.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\testing\stop-local.ps1
 ```
 Logs are stored in:
 ```text
@@ -261,7 +261,7 @@ One-call execute example:
 
 One-call execute helper script (PowerShell):
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\planner-execute.ps1 `
+powershell -ExecutionPolicy Bypass -File .\scripts\testing\planner-execute.ps1 `
   -Prompt "Pantau telegram akun bot_a01 tiap 30 detik dan buat laporan harian jam 07:00" `
   -UseAi `
   -ForceRuleBased `
@@ -345,7 +345,7 @@ Agent workflow notes:
 
 Safe 100+ jobs load simulation:
 ```bash
-python .\simulate_safe_load.py --jobs 100 --interval-sec 30 --work-ms 8000 --jitter-sec 25 --duration-sec 90 --cleanup
+python .\scripts\testing\simulate_safe_load.py --jobs 100 --interval-sec 30 --work-ms 8000 --jitter-sec 25 --duration-sec 90 --cleanup
 ```
 What this does:
 1. Creates 100 recurring synthetic jobs (`simulation.heavy`) without external API dependency.

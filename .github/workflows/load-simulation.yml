@@ -121,7 +121,7 @@ jobs:
             CLEANUP_FLAG="--cleanup"
           fi
 
-          ./.venv/bin/python ./simulate_safe_load.py \
+          ./.venv/bin/python ./scripts/testing/simulate_safe_load.py \
             --api-base "http://127.0.0.1:8000" \
             --jobs "${{ inputs.jobs }}" \
             --interval-sec "${{ inputs.interval_sec }}" \
