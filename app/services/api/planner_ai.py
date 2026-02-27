@@ -1,3 +1,4 @@
+import asyncio
 import inspect
 import json
 import os
@@ -700,6 +701,12 @@ async def build_plan_with_ai_dari_dashboard(request: PlannerAiRequest) -> Planne
         )
         return fallback_plan
 
+    timeout_raw = str(os.getenv("PLANNER_AI_TIMEOUT_SEC") or "45").strip()
+    try:
+        timeout_sec = max(5, min(300, int(timeout_raw)))
+    except Exception:
+        timeout_sec = 45
+
     for index, kredensial in enumerate(kandidat, start=1):
         warning_konteks = _hapus_duplikat(
             [
@@ -708,12 +715,27 @@ async def build_plan_with_ai_dari_dashboard(request: PlannerAiRequest) -> Planne
             ]
         )
 
-        payload, warnings_ai = _jalankan_smolagents(
-            request,
-            model_id_override=kredensial.model_id,
-            api_key_override=kredensial.api_key,
-            api_base_override=kredensial.api_base,
-        )
+        try:
+            payload, warnings_ai = await asyncio.wait_for(
+                asyncio.to_thread(
+                    _jalankan_smolagents,
+                    request,
+                    model_id_override=kredensial.model_id,
+                    api_key_override=kredensial.api_key,
+                    api_base_override=kredensial.api_base,
+                ),
+                timeout=float(timeout_sec),
+            )
+        except asyncio.TimeoutError:
+            payload, warnings_ai = (
+                None,
+                [
+                    f"Planner AI timeout di {kredensial.provider}/{kredensial.account_id} "
+                    f"setelah {timeout_sec} detik."
+                ],
+            )
+        except Exception as exc:
+            payload, warnings_ai = None, [f"Planner AI error di {kredensial.provider}/{kredensial.account_id}: {exc}"]
 
         if payload is None:
             warning_terkumpul = _hapus_duplikat(
