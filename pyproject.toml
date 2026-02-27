@@ -7,7 +7,7 @@ license = "MIT"
 packages = [{ include = "app" }]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = ">=3.10,<4.0"
 fastapi = "^0.104.0"
 uvicorn = "^0.23.2"
 redis = "^4.5.5"
@@ -21,6 +21,8 @@ opentelemetry-exporter-prometheus = ">=0.60b0,<0.61"
 playwright = "^1.41.0"
 pydantic = "^2.4.2"
 python-dotenv = "^1.0.0"
+smolagents = "*"
+litellm = "*"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"

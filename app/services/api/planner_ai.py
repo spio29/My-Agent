@@ -206,15 +206,19 @@ def _inisialisasi_model_litellm(
 
     for nama_model in daftar_nama_model:
         kwargs_dasar: Dict[str, Any] = {nama_model: model_id}
-        daftar_percobaan.append(dict(kwargs_dasar))
+
+        # Prioritaskan kombinasi dengan api_base agar provider lokal
+        # (contoh: Ollama dari container) tidak jatuh ke default localhost.
+        if api_base:
+            for nama_base in daftar_nama_base:
+                if api_key:
+                    daftar_percobaan.append({**kwargs_dasar, nama_base: api_base, "api_key": api_key})
+                daftar_percobaan.append({**kwargs_dasar, nama_base: api_base})
+
         if api_key:
             daftar_percobaan.append({**kwargs_dasar, "api_key": api_key})
 
-        if api_base:
-            for nama_base in daftar_nama_base:
-                daftar_percobaan.append({**kwargs_dasar, nama_base: api_base})
-                if api_key:
-                    daftar_percobaan.append({**kwargs_dasar, nama_base: api_base, "api_key": api_key})
+        daftar_percobaan.append(dict(kwargs_dasar))
 
     errors: List[str] = []
     sudah_dicoba: Set[str] = set()
