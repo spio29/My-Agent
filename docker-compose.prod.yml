@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # ===========================================
   # REDIS - Queue & Storage
