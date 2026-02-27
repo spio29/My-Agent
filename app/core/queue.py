@@ -831,8 +831,41 @@ async def get_queue_metrics() -> Dict[str, int]:
             return {"depth": len(_fallback_stream), "delayed": len(_fallback_delayed)}
 
     try:
-        depth = await redis_client.xlen(STREAM_JOBS)
         delayed = await redis_client.zcard(ZSET_DELAYED)
+
+        # Prefer consumer-group backlog (pending + lag) instead of XLEN, because XLEN
+        # is cumulative and does not represent current queue depth on stream mode.
+        depth: Optional[int] = None
+        groups = await redis_client.xinfo_groups(STREAM_JOBS)
+        for group in groups or []:
+            if isinstance(group, dict):
+                name_raw = group.get("name")
+                pending_raw = group.get("pending", 0)
+                lag_raw = group.get("lag", 0)
+            else:
+                # Some Redis clients may return tuple-like rows.
+                continue
+
+            name = name_raw.decode() if isinstance(name_raw, (bytes, bytearray)) else str(name_raw)
+            if name != CG_WORKERS:
+                continue
+
+            try:
+                pending = int(pending_raw or 0)
+            except Exception:
+                pending = 0
+            try:
+                lag = int(lag_raw or 0)
+            except Exception:
+                lag = 0
+
+            depth = max(0, pending + lag)
+            break
+
+        if depth is None:
+            # Fallback when group info is unavailable.
+            depth = int(await redis_client.xlen(STREAM_JOBS))
+
         return {"depth": int(depth), "delayed": int(delayed)}
     except ResponseError as exc:
         if _error_stream_tidak_didukung(exc):

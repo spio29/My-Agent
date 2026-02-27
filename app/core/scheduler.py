@@ -407,6 +407,7 @@ class Scheduler:
                 scheduled_at=self._datetime_dari_iso(event_antrean.scheduled_at),
                 inputs=event_antrean.inputs,
                 trace_id=event_antrean.trace_id,
+                agent_pool=event_antrean.agent_pool,
             )
         else:
             data_run.status = RunStatus.QUEUED
@@ -414,6 +415,7 @@ class Scheduler:
             data_run.scheduled_at = self._datetime_dari_iso(event_antrean.scheduled_at)
             data_run.inputs = event_antrean.inputs or {}
             data_run.trace_id = event_antrean.trace_id
+            data_run.agent_pool = event_antrean.agent_pool
             data_run.started_at = None
             data_run.finished_at = None
             data_run.result = None

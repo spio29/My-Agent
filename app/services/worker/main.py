@@ -96,14 +96,17 @@ async def _proses_satu_job(worker_id: str, data_event: dict):
     # Check pool assignment
     job_pool = str(data_event.get("agent_pool") or "default").strip().lower()
     worker_pool = _get_agent_pool()
-    
-    # Skip if job is meant for another pool (basic routing simulation for phase 3)
-    # For a real implementation, jobs for different pools should go to different Redis Streams.
+
+    # NOTE:
+    # Current implementation uses a single shared Redis Stream across pools.
+    # Skipping here can strand runs in "queued" because messages are already ACK-ed
+    # at dequeue time. To preserve reliability we process the job even on mismatch.
+    # Strict per-pool routing should only be enabled once multi-stream routing is in place.
     if job_pool != worker_pool and worker_pool != "global":
-        logger.debug(f"Skipping job meant for pool '{job_pool}', worker is on '{worker_pool}'")
-        # In a fully-fledged Phase 3, we would re-enqueue or use multiple streams.
-        # For now, we simulate processing or just mark it skipped (if it was dequeued).
-        return
+        logger.warning(
+            "Pool mismatch detected on shared stream; processing job to avoid stranded queued run",
+            extra={"job_pool": job_pool, "worker_pool": worker_pool, "run_id": data_event.get("run_id")},
+        )
 
     metrics_collector.increment("worker_job_dequeued", tags={"pool": worker_pool, "type": tipe_job})
     

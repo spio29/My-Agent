@@ -1036,6 +1036,7 @@ async def trigger_job(job_id: str):
         scheduled_at=datetime.now(timezone.utc),
         inputs=spesifikasi.get("inputs", {}),
         trace_id=trace_id,
+        agent_pool=spesifikasi.get("agent_pool"),
     )
     await save_run(data_run)
     await add_run_to_job_history(job_id, run_id)
@@ -1049,6 +1050,8 @@ async def trigger_job(job_id: str):
         scheduled_at=_sekarang_iso(),
         timeout_ms=int(spesifikasi.get("timeout_ms", 30000)),
         trace_id=trace_id,
+        agent_pool=spesifikasi.get("agent_pool"),
+        priority=int(spesifikasi.get("priority", 0) or 0),
     )
     await enqueue_job(event_antrean)
     await append_event(

@@ -167,6 +167,7 @@ async def process_job_event(
                 scheduled_at=datetime.fromisoformat(scheduled_at_str) if scheduled_at_str else datetime.now(timezone.utc),
                 inputs=inputs,
                 trace_id=event_data.get("trace_id"),
+                agent_pool=event_data.get("agent_pool"),
             )
         elif not getattr(data_run, "inputs", None):
             data_run.inputs = inputs
