@@ -1,5 +1,5 @@
 import './globals.css';
-import { Plus_Jakarta_Sans, Sora } from 'next/font/google';
+import { Plus_Jakarta_Sans } from 'next/font/google';
 import SidebarNav from '@/components/sidebar-nav';
 
 import Providers from './providers';
@@ -7,13 +7,7 @@ import Providers from './providers';
 const bodyFont = Plus_Jakarta_Sans({
   subsets: ['latin'],
   variable: '--font-body',
-  weight: ['400', '500', '600', '700'],
-});
-
-const headingFont = Sora({
-  subsets: ['latin'],
-  variable: '--font-heading',
-  weight: ['500', '600', '700'],
+  weight: ['400', '500', '600', '700', '800'],
 });
 
 export default function RootLayout({
@@ -23,7 +17,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="id">
-      <body className={`${bodyFont.variable} ${headingFont.variable} antialiased`}>
+      <body className={`${bodyFont.variable} antialiased`}>
         <Providers>
           <div className="min-h-screen">
             <div className="mx-auto flex min-h-screen max-w-[1600px]">
@@ -45,7 +39,7 @@ export default function RootLayout({
                 </div>
               </aside>
 
-              <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
+              <main className="scroll-stable flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
                 <div className="mb-6 rounded-2xl border border-border/80 bg-card p-4 lg:hidden">
                   <h1 className="text-lg font-bold text-foreground">Asisten Spio</h1>
                   <p className="mt-1 text-sm text-muted-foreground">Pantau sistem dan jalankan tugas dengan cepat</p>
@@ -60,6 +54,3 @@ export default function RootLayout({
     </html>
   );
 }
-
-
-
