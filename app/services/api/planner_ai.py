@@ -57,6 +57,42 @@ DEFAULT_MODEL_PER_PROVIDER: Dict[str, str] = {
     "ollama": "ollama/qwen3:8b",
 }
 
+_PLANNER_AI_SEMAPHORE: Optional[asyncio.Semaphore] = None
+_PLANNER_AI_SEMAPHORE_SIZE: int = 0
+
+
+def _planner_ai_timeout_sec() -> int:
+    raw = str(os.getenv("PLANNER_AI_TIMEOUT_SEC") or "45").strip()
+    try:
+        return max(5, min(300, int(raw)))
+    except Exception:
+        return 45
+
+
+def _planner_ai_max_concurrent() -> int:
+    raw = str(os.getenv("PLANNER_AI_MAX_CONCURRENT") or "1").strip()
+    try:
+        return max(1, min(16, int(raw)))
+    except Exception:
+        return 1
+
+
+def _planner_ai_queue_wait_sec() -> float:
+    raw = str(os.getenv("PLANNER_AI_QUEUE_WAIT_SEC") or "1.5").strip()
+    try:
+        return max(0.1, min(30.0, float(raw)))
+    except Exception:
+        return 1.5
+
+
+def _get_planner_ai_semaphore() -> Tuple[asyncio.Semaphore, int]:
+    global _PLANNER_AI_SEMAPHORE, _PLANNER_AI_SEMAPHORE_SIZE
+    size = _planner_ai_max_concurrent()
+    if _PLANNER_AI_SEMAPHORE is None or _PLANNER_AI_SEMAPHORE_SIZE != size:
+        _PLANNER_AI_SEMAPHORE = asyncio.Semaphore(size)
+        _PLANNER_AI_SEMAPHORE_SIZE = size
+    return _PLANNER_AI_SEMAPHORE, size
+
 
 def _normalisasi_teks(text: str) -> str:
     return " ".join(text.lower().strip().split())
@@ -701,67 +737,89 @@ async def build_plan_with_ai_dari_dashboard(request: PlannerAiRequest) -> Planne
         )
         return fallback_plan
 
-    timeout_raw = str(os.getenv("PLANNER_AI_TIMEOUT_SEC") or "45").strip()
+    timeout_sec = _planner_ai_timeout_sec()
+    queue_wait_sec = _planner_ai_queue_wait_sec()
+    semaphore, max_concurrent = _get_planner_ai_semaphore()
+
     try:
-        timeout_sec = max(5, min(300, int(timeout_raw)))
-    except Exception:
-        timeout_sec = 45
-
-    for index, kredensial in enumerate(kandidat, start=1):
-        warning_konteks = _hapus_duplikat(
+        await asyncio.wait_for(semaphore.acquire(), timeout=queue_wait_sec)
+    except asyncio.TimeoutError:
+        fallback_plan.warnings = _hapus_duplikat(
             [
+                *fallback_plan.warnings,
                 *warning_terkumpul,
-                f"Mencoba planner AI lewat {kredensial.provider}/{kredensial.account_id} (percobaan {index}/{len(kandidat)}).",
-            ]
-        )
-
-        try:
-            payload, warnings_ai = await asyncio.wait_for(
-                asyncio.to_thread(
-                    _jalankan_smolagents,
-                    request,
-                    model_id_override=kredensial.model_id,
-                    api_key_override=kredensial.api_key,
-                    api_base_override=kredensial.api_base,
+                (
+                    f"Planner AI sedang sibuk (maks {max_concurrent} concurrent). "
+                    f"Fallback ke rule-based setelah menunggu {queue_wait_sec:.1f} detik."
                 ),
-                timeout=float(timeout_sec),
-            )
-        except asyncio.TimeoutError:
-            payload, warnings_ai = (
-                None,
-                [
-                    f"Planner AI timeout di {kredensial.provider}/{kredensial.account_id} "
-                    f"setelah {timeout_sec} detik."
-                ],
-            )
-        except Exception as exc:
-            payload, warnings_ai = None, [f"Planner AI error di {kredensial.provider}/{kredensial.account_id}: {exc}"]
-
-        if payload is None:
-            warning_terkumpul = _hapus_duplikat(
-                [*warning_konteks, *warnings_ai, f"Planner AI gagal di {kredensial.provider}/{kredensial.account_id}."]
-            )
-            continue
-
-        ai_plan = build_plan_from_ai_payload(request, payload)
-        if ai_plan.jobs:
-            ai_plan.warnings = _hapus_duplikat([*ai_plan.warnings, *warning_konteks, *warnings_ai])
-            return ai_plan
-
-        warning_terkumpul = _hapus_duplikat(
-            [
-                *warning_konteks,
-                *warnings_ai,
-                *ai_plan.warnings,
-                f"Planner AI di {kredensial.provider}/{kredensial.account_id} tidak menghasilkan job valid.",
             ]
         )
+        return fallback_plan
 
-    fallback_plan.warnings = _hapus_duplikat(
-        [
-            *fallback_plan.warnings,
-            *warning_terkumpul,
-            "Planner AI gagal di semua provider yang tersedia. Sistem memakai planner rule-based.",
-        ]
-    )
-    return fallback_plan
+    try:
+        for index, kredensial in enumerate(kandidat, start=1):
+            warning_konteks = _hapus_duplikat(
+                [
+                    *warning_terkumpul,
+                    f"Mencoba planner AI lewat {kredensial.provider}/{kredensial.account_id} (percobaan {index}/{len(kandidat)}).",
+                ]
+            )
+
+            try:
+                payload, warnings_ai = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        _jalankan_smolagents,
+                        request,
+                        model_id_override=kredensial.model_id,
+                        api_key_override=kredensial.api_key,
+                        api_base_override=kredensial.api_base,
+                    ),
+                    timeout=float(timeout_sec),
+                )
+            except asyncio.TimeoutError:
+                payload, warnings_ai = (
+                    None,
+                    [
+                        f"Planner AI timeout di {kredensial.provider}/{kredensial.account_id} "
+                        f"setelah {timeout_sec} detik."
+                    ],
+                )
+            except Exception as exc:
+                payload, warnings_ai = None, [
+                    f"Planner AI error di {kredensial.provider}/{kredensial.account_id}: {exc}"
+                ]
+
+            if payload is None:
+                warning_terkumpul = _hapus_duplikat(
+                    [
+                        *warning_konteks,
+                        *warnings_ai,
+                        f"Planner AI gagal di {kredensial.provider}/{kredensial.account_id}.",
+                    ]
+                )
+                continue
+
+            ai_plan = build_plan_from_ai_payload(request, payload)
+            if ai_plan.jobs:
+                ai_plan.warnings = _hapus_duplikat([*ai_plan.warnings, *warning_konteks, *warnings_ai])
+                return ai_plan
+
+            warning_terkumpul = _hapus_duplikat(
+                [
+                    *warning_konteks,
+                    *warnings_ai,
+                    *ai_plan.warnings,
+                    f"Planner AI di {kredensial.provider}/{kredensial.account_id} tidak menghasilkan job valid.",
+                ]
+            )
+
+        fallback_plan.warnings = _hapus_duplikat(
+            [
+                *fallback_plan.warnings,
+                *warning_terkumpul,
+                "Planner AI gagal di semua provider yang tersedia. Sistem memakai planner rule-based.",
+            ]
+        )
+        return fallback_plan
+    finally:
+        semaphore.release()
