@@ -1,13 +1,19 @@
 import './globals.css';
-import { Plus_Jakarta_Sans } from 'next/font/google';
+import { DM_Sans, Montserrat } from 'next/font/google';
 import SidebarNav from '@/components/sidebar-nav';
 
 import Providers from './providers';
 
-const bodyFont = Plus_Jakarta_Sans({
+const bodyFont = DM_Sans({
   subsets: ['latin'],
   variable: '--font-body',
-  weight: ['400', '500', '600', '700', '800'],
+  weight: ['400', '500', '700'],
+});
+
+const headingFont = Montserrat({
+  subsets: ['latin'],
+  variable: '--font-heading',
+  weight: ['500', '600', '700', '800'],
 });
 
 export default function RootLayout({
@@ -17,7 +23,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="id">
-      <body className={`${bodyFont.variable} h-screen w-screen overflow-hidden antialiased`}>
+      <body className={`${bodyFont.variable} ${headingFont.variable} h-screen w-screen overflow-hidden antialiased`}>
         <Providers>
           <div className="relative h-screen w-screen overflow-hidden bg-gradient-to-br from-[#EAF4FF] via-[#F0F7FF] to-[#E2EFFF] p-3 lg:p-4">
             <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -30,22 +36,22 @@ export default function RootLayout({
             <div className="relative mx-auto flex h-full max-w-[1720px] gap-3">
               <aside className="hidden h-full w-72 shrink-0 glass-island lg:flex lg:flex-col">
                 <div className="border-b border-white/80 px-5 py-5">
-                  <span className="inline-flex rounded-2xl bg-[#42A5F5]/22 px-3 py-1 text-xs font-bold tracking-tight text-[#1F5D93]">
+                  <span className="inline-flex rounded-2xl bg-[#42A5F5]/22 px-3 py-1 text-xs font-bold tracking-wide text-[#1F5D93] font-montserrat">
                     Holding
                   </span>
-                  <h1 className="mt-3 text-xl font-black tracking-tighter text-slate-900">Spio</h1>
-                  <p className="mt-1 text-xs text-blue-900/60">Kontrol ringkas.</p>
+                  <h1 className="mt-3 font-signature text-5xl leading-none text-slate-900">Spio</h1>
+                  <p className="mt-1 text-xs text-blue-900/60 font-body-copy">Kontrol ringkas.</p>
                 </div>
 
                 <SidebarNav />
 
-                <div className="mt-auto border-t border-white/80 px-5 py-4 text-xs font-semibold text-blue-900/60">v0.1.0</div>
+                <div className="mt-auto border-t border-white/80 px-5 py-4 text-xs font-semibold text-blue-900/60 font-montserrat">v0.1.0</div>
               </aside>
 
               <main className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
                 <div className="glass-island mb-3 p-4 lg:hidden">
-                  <h1 className="text-lg font-black tracking-tighter text-slate-900">Spio</h1>
-                  <p className="mt-1 text-xs text-blue-900/60">Kontrol.</p>
+                  <h1 className="font-signature text-4xl leading-none text-slate-900">Spio</h1>
+                  <p className="mt-1 text-xs text-blue-900/60 font-body-copy">Kontrol.</p>
                   <SidebarNav compact />
                 </div>
                 <div className="min-h-0 flex-1 overflow-hidden">{children}</div>

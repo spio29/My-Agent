@@ -25,6 +25,14 @@
   --ring: 207 88% 62%;
 }
 
+@font-face {
+  font-family: "Daviesta";
+  src: url("/fonts/daviesta.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -38,22 +46,21 @@ body {
 
 body {
   margin: 0;
-  font-family: var(--font-body), "Plus Jakarta Sans", "Segoe UI", sans-serif;
-  line-height: 1.4;
+  font-family: var(--font-body), "DM Sans", "Segoe UI", sans-serif;
+  line-height: 1.5;
   background: transparent;
   color: hsl(var(--foreground));
 }
 
-h1,
 h2,
 h3,
 h4,
 h5,
 h6,
 .ui-heading {
-  font-family: var(--font-body), "Plus Jakarta Sans", "Segoe UI", sans-serif;
-  letter-spacing: -0.05em;
-  font-weight: 900;
+  font-family: var(--font-heading), "Montserrat", "Segoe UI", sans-serif;
+  letter-spacing: 0.02em;
+  font-weight: 700;
   color: rgb(15 23 42);
 }
 
@@ -91,6 +98,24 @@ a {
     @apply rounded-3xl border border-white bg-white/70 shadow-xl shadow-blue-900/5 backdrop-blur-xl ring-1 ring-[#42A5F5]/20;
   }
 
+  .font-signature {
+    font-family: "Daviesta", "Segoe Script", cursive;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+  }
+
+  .font-montserrat {
+    font-family: var(--font-heading), "Montserrat", "Segoe UI", sans-serif;
+  }
+
+  .font-body-copy {
+    font-family: var(--font-body), "DM Sans", "Segoe UI", sans-serif;
+  }
+
+  .metric-label {
+    @apply text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-900/60 font-montserrat;
+  }
+
   .metric-card-hover {
     @apply transition-transform duration-200 hover:-translate-y-1;
   }
@@ -117,9 +142,10 @@ a {
   }
 
   .metric-number {
+    font-family: var(--font-heading), "Montserrat", "Segoe UI", sans-serif;
     font-variant-numeric: tabular-nums;
-    font-weight: 900;
-    letter-spacing: -0.06em;
+    font-weight: 700;
+    letter-spacing: 0.03em;
     color: rgb(15 23 42);
   }
 
