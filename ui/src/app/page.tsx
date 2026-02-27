@@ -308,8 +308,8 @@ export default function ChairmanDashboard() {
       </div>
 
       {/* Health Beacon Footer */}
-      <footer className="fixed bottom-0 left-0 w-full bg-card/80 backdrop-blur-md border-t border-border/50 py-2 px-6 flex items-center justify-between text-[10px] font-bold tracking-widest text-muted-foreground z-50">
-        <div className="flex gap-6">
+      <footer className="sticky bottom-0 z-20 mt-4 w-full rounded-2xl border border-border/50 bg-card/90 px-4 py-2 text-[10px] font-bold tracking-widest text-muted-foreground backdrop-blur-md sm:flex sm:items-center sm:justify-between sm:px-6">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
           <div className="flex items-center gap-2">
             <div className={`h-1.5 w-1.5 rounded-full ${infra.api?.status === "ok" ? "bg-emerald-500" : "bg-rose-500"}`}></div>
             <span>API: {infra.api?.status?.toUpperCase() || "CHECKING"}</span>
@@ -323,7 +323,7 @@ export default function ChairmanDashboard() {
             <span>AI FACTORY: {infra.ai_factory?.status?.toUpperCase() || "NOT CONFIGURED"}</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="mt-1 flex items-center gap-2 sm:mt-0 sm:justify-end">
           <Activity className="h-3 w-3" />
           <span>SPIO SOVEREIGN OS v1.0</span>
         </div>
