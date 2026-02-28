@@ -1,6 +1,6 @@
 import { toast } from "sonner";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api";
 const API_AUTH_STORAGE_KEY = "spio_api_token";
 const API_AUTH_HEADER = process.env.NEXT_PUBLIC_API_AUTH_HEADER || "Authorization";
 const API_AUTH_SCHEME = process.env.NEXT_PUBLIC_API_AUTH_SCHEME || "Bearer";
@@ -1268,5 +1268,10 @@ export const getSystemInfrastructure = async (): Promise<any> => {
 export const executePlannerPrompt = async (payload: PlannerExecuteRequest): Promise<PlannerExecuteResponse> => {
   return await send<PlannerExecuteResponse>("/planner/execute", "POST", payload);
 };
-export const getMemory = async () => fetch("http://213.163.193.6:8000/memory").then(r => r.json());
-export const saveMemory = async (data: any) => fetch("http://213.163.193.6:8000/memory", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data)}).then(r => r.json());
+export interface MemoryEntry {
+  key: string;
+  value: unknown;
+}
+
+export const getMemory = async (): Promise<MemoryEntry[]> => getJson<MemoryEntry[]>("/memory");
+export const saveMemory = async (data: any): Promise<unknown> => send<unknown>("/memory", "POST", data);

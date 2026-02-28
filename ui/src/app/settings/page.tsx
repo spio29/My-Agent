@@ -466,7 +466,7 @@ const formatRingkasanEvent = (event: SystemEvent) => {
 };
 
 export default function SettingsPage() {
-  const [urlDasarApi, setUrlDasarApi] = useState(process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000");
+  const [urlDasarApi, setUrlDasarApi] = useState(process.env.NEXT_PUBLIC_API_BASE || "/api");
   const [tokenApi, setTokenApi] = useState("");
   const [jedaPembaruan, setJedaPembaruan] = useState(5);
   const [refreshOtomatis, setRefreshOtomatis] = useState(true);
@@ -1496,7 +1496,7 @@ export default function SettingsPage() {
               id="api-base-url"
               value={urlDasarApi}
               onChange={(event) => setUrlDasarApi(event.target.value)}
-              placeholder="http://localhost:8000"
+              placeholder="/api"
             />
             <p className="mt-1 text-sm text-muted-foreground">Isi dengan alamat backend yang bisa diakses browser.</p>
           </div>
