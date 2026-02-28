@@ -53,6 +53,24 @@ DEFAULT_RETRY: Dict[str, RetryPolicy] = {
     "agent.workflow": RetryPolicy(max_retry=1, backoff_sec=[2, 5]),
 }
 
+JOB_TYPE_ALIAS_TO_CANONICAL: Dict[str, str] = {
+    "monitor": "monitor.channel",
+    "channel": "monitor.channel",
+    "telegram": "monitor.channel",
+    "whatsapp": "monitor.channel",
+    "pantau": "monitor.channel",
+    "report": "report.daily",
+    "laporan": "report.daily",
+    "harian": "report.daily",
+    "daily": "report.daily",
+    "backup": "backup.export",
+    "export": "backup.export",
+    "cadangan": "backup.export",
+    "workflow": "agent.workflow",
+    "agent": "agent.workflow",
+    "alur": "agent.workflow",
+}
+
 PROVIDER_CHAIN_DEFAULT: List[str] = ["openai", "ollama"]
 DEFAULT_MODEL_PER_PROVIDER: Dict[str, str] = {
     "openai": "openai/gpt-4o-mini",
@@ -854,28 +872,10 @@ def _normalisasi_job_type_ai(
     raw = str(raw_job_type or "").strip()
     normalized = raw.lower()
 
-    mapping = {
-        "monitor": "monitor.channel",
-        "channel": "monitor.channel",
-        "telegram": "monitor.channel",
-        "whatsapp": "monitor.channel",
-        "pantau": "monitor.channel",
-        "report": "report.daily",
-        "laporan": "report.daily",
-        "harian": "report.daily",
-        "daily": "report.daily",
-        "backup": "backup.export",
-        "export": "backup.export",
-        "cadangan": "backup.export",
-        "workflow": "agent.workflow",
-        "agent": "agent.workflow",
-        "alur": "agent.workflow",
-    }
-
     if normalized in ALLOWED_JOB_TYPES:
         return normalized, None
 
-    mapped = mapping.get(normalized)
+    mapped = JOB_TYPE_ALIAS_TO_CANONICAL.get(normalized)
     if mapped:
         return mapped, raw
 
@@ -979,9 +979,10 @@ def build_plan_from_ai_payload(request: PlannerAiRequest, payload: Dict[str, Any
         raw_job_type = str(item.get("type") or "").strip()
         job_type, mapped_from = _normalisasi_job_type_ai(raw_job_type, item, request)
         if raw_job_type and mapped_from is not None and raw_job_type != job_type:
-            warnings.append(
-                f"Job #{index + 1}: type '{raw_job_type}' dinormalisasi menjadi '{job_type}'."
-            )
+            if raw_job_type.lower() not in JOB_TYPE_ALIAS_TO_CANONICAL:
+                warnings.append(
+                    f"Job #{index + 1}: type '{raw_job_type}' dinormalisasi menjadi '{job_type}'."
+                )
         if job_type not in ALLOWED_JOB_TYPES:
             warnings.append(f"Job #{index + 1}: type '{raw_job_type}' tidak didukung, dilewati.")
             continue

@@ -231,6 +231,33 @@ def test_build_plan_from_ai_payload_enriches_missing_intent_jobs():
     assert any("melengkapi output AI" in warning for warning in plan.warnings)
 
 
+def test_build_plan_from_ai_payload_no_warning_for_common_type_alias():
+    request = PlannerAiRequest(
+        prompt="monitor telegram",
+        timezone="Asia/Jakarta",
+        default_channel="telegram",
+        default_account_id="bot_a01",
+    )
+
+    payload = {
+        "summary": "Rencana dari AI",
+        "jobs": [
+            {
+                "type": "monitor",
+                "reason": "Pantau channel",
+                "schedule": {"interval_sec": 30},
+                "inputs": {},
+            }
+        ],
+    }
+
+    plan = build_plan_from_ai_payload(request, payload)
+
+    assert len(plan.jobs) == 1
+    assert plan.jobs[0].job_spec.type == "monitor.channel"
+    assert not any("dinormalisasi menjadi" in warning for warning in plan.warnings)
+
+
 def test_build_plan_from_ai_payload_localizes_business_warnings_to_indonesian():
     request = PlannerAiRequest(
         prompt="monitor telegram",
