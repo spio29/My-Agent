@@ -203,6 +203,34 @@ def test_build_plan_from_ai_payload_filters_low_signal_messages():
     assert not any("local environment is set up" in item.lower() for item in plan.assumptions)
 
 
+def test_build_plan_from_ai_payload_enriches_missing_intent_jobs():
+    request = PlannerAiRequest(
+        prompt="pantau telegram tiap 30 detik dan kirim report harian jam 08:00",
+        timezone="Asia/Jakarta",
+        default_channel="telegram",
+        default_account_id="bot_a01",
+    )
+
+    payload = {
+        "summary": "Rencana dari AI",
+        "jobs": [
+            {
+                "type": "monitor.channel",
+                "reason": "Pantau channel",
+                "schedule": {"interval_sec": 30},
+                "inputs": {"channel": "telegram", "account_id": "bot_a01"},
+            }
+        ],
+    }
+
+    plan = build_plan_from_ai_payload(request, payload)
+    job_types = [job.job_spec.type for job in plan.jobs]
+
+    assert "monitor.channel" in job_types
+    assert "report.daily" in job_types
+    assert any("melengkapi output AI" in warning for warning in plan.warnings)
+
+
 def test_resolve_planner_ai_credentials_uses_dashboard_account(monkeypatch):
     async def fake_get_integration_account(provider: str, account_id: str, include_secret: bool = False):
         assert provider == "openai"
