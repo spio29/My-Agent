@@ -409,7 +409,7 @@ async def resolve_planner_ai_credential_candidates(
     account_target = str(request.ai_account_id or "").strip() or str(request.openai_account_id or "default").strip() or "default"
     model_request = str(request.model_id or "").strip()
 
-    provider_chain = [provider_request] if provider_request != "auto" else list(PROVIDER_CHAIN_DEFAULT)
+    provider_chain = [provider_request] if provider_request != "auto" else ([p for p in (_normalisasi_provider(item) for item in str(os.getenv("PLANNER_AI_PROVIDER_CHAIN") or ",".join(PROVIDER_CHAIN_DEFAULT)).split(",")) if p in ("openai", "ollama")] or list(PROVIDER_CHAIN_DEFAULT))
 
     for provider in provider_chain:
         butuh_warning = provider_request != "auto" or len(daftar_kandidat) == 0
