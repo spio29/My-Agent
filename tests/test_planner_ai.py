@@ -163,6 +163,46 @@ def test_build_plan_from_ai_payload_parses_human_readable_schedule_string():
     assert not any("format schedule string tidak dikenali" in warning for warning in plan.warnings)
 
 
+def test_build_plan_from_ai_payload_filters_low_signal_messages():
+    request = PlannerAiRequest(
+        prompt="test planner ai lokal",
+        timezone="Asia/Jakarta",
+        default_channel="telegram",
+        default_account_id="bot_a01",
+    )
+
+    payload = {
+        "summary": "Rencana dari AI",
+        "assumptions": [
+            "The local environment is set up.",
+            "The AI Planner has access to the necessary libraries.",
+            "Asumsi bisnis penting",
+        ],
+        "warnings": [
+            "The AI Planner is running locally.",
+            "The AI Planner is set up for local use.",
+            "Warning penting",
+        ],
+        "jobs": [
+            {
+                "type": "monitor.channel",
+                "reason": "Pantau channel",
+                "schedule": None,
+                "warnings": ["The AI Planner is ready for execution."],
+                "inputs": {},
+            }
+        ],
+    }
+
+    plan = build_plan_from_ai_payload(request, payload)
+
+    assert plan.jobs
+    assert "Asumsi bisnis penting" in plan.assumptions
+    assert "Warning penting" in plan.warnings
+    assert not any("AI Planner is running locally" in item for item in plan.warnings)
+    assert not any("local environment is set up" in item.lower() for item in plan.assumptions)
+
+
 def test_resolve_planner_ai_credentials_uses_dashboard_account(monkeypatch):
     async def fake_get_integration_account(provider: str, account_id: str, include_secret: bool = False):
         assert provider == "openai"
@@ -356,3 +396,45 @@ def test_build_plan_with_ai_timeout_keeps_slot_busy_until_worker_done(monkeypatc
     assert second_result.planner_source == "rule_based"
     assert any("sedang sibuk" in item for item in second_result.warnings)
     assert second_latency < 0.25
+
+
+def test_build_plan_with_ai_dashboard_success_hides_attempt_warning(monkeypatch):
+    async def fake_resolve_candidates(_request):
+        return [
+            planner_ai.PlannerAiCredentials(
+                provider="ollama",
+                account_id="default",
+                model_id="ollama/gemini-q8:latest",
+                api_key="ollama",
+                api_base="http://localhost:11434",
+            )
+        ], []
+
+    def fake_jalankan(*_args, **_kwargs):
+        return {
+            "summary": "ok",
+            "jobs": [
+                {
+                    "type": "monitor.channel",
+                    "reason": "Pantau channel",
+                    "schedule": None,
+                    "inputs": {},
+                }
+            ],
+        }, []
+
+    monkeypatch.setattr(planner_ai, "resolve_planner_ai_credential_candidates", fake_resolve_candidates)
+    monkeypatch.setattr(planner_ai, "_jalankan_smolagents", fake_jalankan)
+    monkeypatch.setenv("PLANNER_AI_MAX_CONCURRENT", "1")
+    monkeypatch.setenv("PLANNER_AI_QUEUE_WAIT_SEC", "0.5")
+    monkeypatch.setenv("PLANNER_AI_TIMEOUT_SEC", "2")
+
+    _reset_planner_ai_limiter_state()
+    try:
+        request = PlannerAiRequest(prompt="monitor telegram account_id bot_a01 tiap 30 detik")
+        plan = asyncio.run(planner_ai.build_plan_with_ai_dari_dashboard(request))
+    finally:
+        _reset_planner_ai_limiter_state()
+
+    assert plan.jobs
+    assert not any("Mencoba planner AI lewat" in item for item in plan.warnings)

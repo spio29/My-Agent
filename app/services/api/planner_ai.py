@@ -155,6 +155,28 @@ def _hapus_duplikat(items: List[str]) -> List[str]:
     return output
 
 
+LOW_SIGNAL_AI_MESSAGE_PATTERNS: Tuple[str, ...] = (
+    "ai planner is running locally",
+    "ai planner is set up for local use",
+    "ai planner is ready for execution",
+    "the local environment is set up",
+    "the ai planner has access to the necessary libraries",
+)
+
+
+def _hapus_pesan_low_signal(items: List[str]) -> List[str]:
+    output: List[str] = []
+    for item in items:
+        cleaned = str(item or "").strip()
+        if not cleaned:
+            continue
+        lowered = cleaned.lower()
+        if any(pattern in lowered for pattern in LOW_SIGNAL_AI_MESSAGE_PATTERNS):
+            continue
+        output.append(cleaned)
+    return output
+
+
 def _normalisasi_provider(provider: str) -> str:
     cleaned = str(provider or "").strip().lower()
     return cleaned or "auto"
@@ -827,8 +849,10 @@ def build_plan_from_ai_payload(request: PlannerAiRequest, payload: Dict[str, Any
     jobs: List[PlannerJob] = []
     used_ids: Set[str] = set()
 
-    assumptions.extend(payload.get("assumptions", []) if isinstance(payload.get("assumptions"), list) else [])
-    warnings.extend(payload.get("warnings", []) if isinstance(payload.get("warnings"), list) else [])
+    assumptions.extend(
+        _hapus_pesan_low_signal(payload.get("assumptions", []) if isinstance(payload.get("assumptions"), list) else [])
+    )
+    warnings.extend(_hapus_pesan_low_signal(payload.get("warnings", []) if isinstance(payload.get("warnings"), list) else []))
 
     raw_jobs = payload.get("jobs")
     if not isinstance(raw_jobs, list):
@@ -851,8 +875,12 @@ def build_plan_from_ai_payload(request: PlannerAiRequest, payload: Dict[str, Any
             continue
 
         reason = str(item.get("reason") or f"Dibuat oleh planner AI untuk type {job_type}.")
-        item_assumptions = item.get("assumptions", []) if isinstance(item.get("assumptions"), list) else []
-        item_warnings = item.get("warnings", []) if isinstance(item.get("warnings"), list) else []
+        item_assumptions = _hapus_pesan_low_signal(
+            item.get("assumptions", []) if isinstance(item.get("assumptions"), list) else []
+        )
+        item_warnings = _hapus_pesan_low_signal(
+            item.get("warnings", []) if isinstance(item.get("warnings"), list) else []
+        )
 
         if job_type == "agent.workflow":
             schedule = None
@@ -926,8 +954,8 @@ def build_plan_from_ai_payload(request: PlannerAiRequest, payload: Dict[str, Any
         assumptions.extend(job.assumptions)
         warnings.extend(job.warnings)
 
-    assumptions = _hapus_duplikat(assumptions)
-    warnings = _hapus_duplikat(warnings)
+    assumptions = _hapus_duplikat(_hapus_pesan_low_signal(assumptions))
+    warnings = _hapus_duplikat(_hapus_pesan_low_signal(warnings))
 
     summary = str(payload.get("summary") or f"Planner AI menghasilkan {len(jobs)} rencana tugas.")
     if not jobs:
@@ -953,7 +981,7 @@ def build_plan_with_ai(
     pre_warnings: Optional[List[str]] = None,
 ) -> PlannerResponse:
     fallback_plan = build_plan_from_prompt(request)
-    warning_awal = _hapus_duplikat(list(pre_warnings or []))
+    warning_awal = _hapus_duplikat(_hapus_pesan_low_signal(list(pre_warnings or [])))
 
     if request.force_rule_based:
         fallback_plan.warnings = _hapus_duplikat(
@@ -967,7 +995,7 @@ def build_plan_with_ai(
         api_key_override=api_key_override,
         api_base_override=api_base_override,
     )
-    gabung_warning_ai = _hapus_duplikat([*warning_awal, *ai_warnings])
+    gabung_warning_ai = _hapus_duplikat(_hapus_pesan_low_signal([*warning_awal, *ai_warnings]))
     if payload is None:
         fallback_plan.warnings = _hapus_duplikat(
             [
@@ -1004,7 +1032,7 @@ async def build_plan_with_ai_dari_dashboard(request: PlannerAiRequest) -> Planne
         )
         return fallback_plan
 
-    warning_terkumpul = list(warnings_awal)
+    warning_terkumpul = _hapus_duplikat(_hapus_pesan_low_signal(list(warnings_awal)))
     if not kandidat:
         fallback_plan.warnings = _hapus_duplikat(
             [
@@ -1095,7 +1123,9 @@ async def build_plan_with_ai_dari_dashboard(request: PlannerAiRequest) -> Planne
 
             ai_plan = build_plan_from_ai_payload(request, payload)
             if ai_plan.jobs:
-                ai_plan.warnings = _hapus_duplikat([*ai_plan.warnings, *warning_konteks, *warnings_ai])
+                ai_plan.warnings = _hapus_duplikat(
+                    _hapus_pesan_low_signal([*ai_plan.warnings, *warning_terkumpul, *warnings_ai])
+                )
                 return ai_plan
 
             warning_terkumpul = _hapus_duplikat(
