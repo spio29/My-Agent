@@ -206,9 +206,18 @@ def _lokalisasi_pesan(text: str) -> str:
         "telegram is running and accessible.": "Telegram aktif dan dapat diakses.",
         "ensure telegram is running and accessible.": "Pastikan Telegram aktif dan dapat diakses.",
         "ensure the channel is active and accessible.": "Pastikan channel aktif dan dapat diakses.",
-        "verify the api key is valid and accessible.": "Pastikan API key valid dan dapat diakses.",
+        "verify the api key is valid and accessible.": "Pastikan kunci API valid dan dapat diakses.",
         "ensure the telegram account is active and has access to the channel.": (
             "Pastikan akun Telegram aktif dan memiliki akses ke channel."
+        ),
+        "ensure the user has the necessary permissions to send reports.": (
+            "Pastikan pengguna memiliki izin untuk mengirim laporan."
+        ),
+        "ensure the user has the necessary permissions to view messages.": (
+            "Pastikan pengguna memiliki izin untuk melihat pesan."
+        ),
+        "ensure the user has the necessary permissions to generate reports.": (
+            "Pastikan pengguna memiliki izin untuk membuat laporan."
         ),
     }
 
@@ -219,12 +228,16 @@ def _lokalisasi_pesan(text: str) -> str:
 
     replacements: List[Tuple[str, str]] = [
         (r"(?i)\bthe user has the necessary permissions to\b", "pengguna memiliki izin untuk"),
+        (r"(?i)\bthe user has necessary permissions to\b", "pengguna memiliki izin untuk"),
         (r"(?i)\bsend reports\b", "mengirim laporan"),
         (r"(?i)\bview messages\b", "melihat pesan"),
         (r"(?i)\bgenerate reports\b", "membuat laporan"),
-        (r"(?i)\bapi key\b", "API key"),
+        (r"(?i)\bapi key\b", "kunci API"),
         (r"(?i)\btelegram\b", "Telegram"),
         (r"(?i)\bchannel\b", "channel"),
+        (r"(?i)\bis running and accessible\b", "aktif dan dapat diakses"),
+        (r"(?i)\bis active and accessible\b", "aktif dan dapat diakses"),
+        (r"(?i)\bhas access to the channel\b", "memiliki akses ke channel"),
     ]
     for pattern, replacement in replacements:
         result = re.sub(pattern, replacement, result)
@@ -239,9 +252,16 @@ def _lokalisasi_pesan(text: str) -> str:
     if verify_match:
         clause = verify_match.group(1).strip()
         if clause:
-            return f"Verifikasi {clause}."
+            return f"Pastikan {clause}."
 
-    return result
+    fallback = re.sub(r"\s+", " ", result).strip()
+    if not fallback:
+        return ""
+    if fallback == cleaned:
+        return cleaned
+    if not fallback.endswith("."):
+        fallback += "."
+    return fallback[0].upper() + fallback[1:]
 
 
 def _lokalisasi_kumpulan_pesan(items: List[str]) -> List[str]:
