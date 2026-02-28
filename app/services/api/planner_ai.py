@@ -3,6 +3,8 @@ import inspect
 import json
 import os
 import re
+import urllib.error
+import urllib.request
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from pydantic import BaseModel, Field
@@ -187,6 +189,28 @@ def _ambil_base_url_dari_config(config: Any) -> str:
     return ""
 
 
+def _ambil_env_int_terbatas(nama: str, default: int, minimum: int, maksimum: int) -> int:
+    raw = str(os.getenv(nama) or "").strip()
+    if not raw:
+        return default
+    try:
+        return max(minimum, min(maksimum, int(raw)))
+    except Exception:
+        return default
+
+
+def _normalisasi_ollama_base_url(raw: Optional[str]) -> str:
+    base = str(raw or "").strip()
+    if not base:
+        base = str(os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434").strip()
+    if not base:
+        base = "http://localhost:11434"
+    base = base.rstrip("/")
+    if base.lower().endswith("/v1"):
+        base = base[:-3].rstrip("/")
+    return base
+
+
 def _akun_provider_siapsaji(provider: str, row: Optional[Dict[str, Any]]) -> bool:
     if not row or not isinstance(row, dict):
         return False
@@ -220,7 +244,28 @@ def _ekstrak_teks_json(raw: Any) -> Optional[str]:
     return text[start : end + 1]
 
 
-def _bangun_prompt_smolagents(request: PlannerAiRequest) -> str:
+def _bangun_prompt_smolagents(
+    request: PlannerAiRequest,
+    *,
+    compact: bool = False,
+    prompt_user_override: Optional[str] = None,
+) -> str:
+    prompt_user = str(prompt_user_override if prompt_user_override is not None else request.prompt).strip()
+
+    if compact:
+        return (
+            "Kamu adalah planner sistem job backend Python. "
+            "Kembalikan HANYA JSON valid dengan schema: "
+            "{summary:string, assumptions:string[], warnings:string[], jobs:[{job_id?:string,type:string,reason:string,assumptions:string[],warnings:string[],schedule:object|null,timeout_ms:number,retry_policy:{max_retry:number,backoff_sec:number[]},inputs:object}]}. "
+            "Type job yang diizinkan: monitor.channel, report.daily, backup.export, agent.workflow. "
+            "Jika data kurang, isi assumptions dan pakai default aman. "
+            "Untuk report/backup harian prefer cron.\n"
+            f"Prompt user: {prompt_user}\n"
+            f"Timezone default: {request.timezone}\n"
+            f"Default channel: {request.default_channel}\n"
+            f"Default account_id: {request.default_account_id}\n"
+        )
+
     return (
         "Kamu adalah planner sistem job backend Python.\n"
         "Ubah prompt user menjadi rencana job terstruktur dalam JSON valid.\n"
@@ -244,7 +289,7 @@ def _bangun_prompt_smolagents(request: PlannerAiRequest) -> str:
         "    }\n"
         "  ]\n"
         "}\n\n"
-        f"Prompt user: {request.prompt}\n"
+        f"Prompt user: {prompt_user}\n"
         f"Timezone default: {request.timezone}\n"
         f"Default channel: {request.default_channel}\n"
         f"Default account_id: {request.default_account_id}\n\n"
@@ -465,6 +510,72 @@ async def resolve_planner_ai_credentials(
     return model_id, api_key, _hapus_duplikat(warnings)
 
 
+def _jalankan_ollama_direct(
+    request: PlannerAiRequest,
+    *,
+    model_id: str,
+    api_base_override: Optional[str] = None,
+) -> Tuple[Optional[Dict[str, Any]], List[str]]:
+    warnings: List[str] = []
+    base_url = _normalisasi_ollama_base_url(api_base_override)
+    model_name = model_id.split("/", 1)[1] if model_id.startswith("ollama/") else model_id
+    timeout_sec = _ambil_env_int_terbatas("PLANNER_AI_OLLAMA_TIMEOUT_SEC", _planner_ai_timeout_sec(), 5, 300)
+
+    payload = {
+        "model": model_name,
+        "prompt": _bangun_prompt_smolagents(request, compact=True),
+        "stream": False,
+        "format": "json",
+        "options": {
+            "temperature": 0.0,
+        },
+    }
+
+    req = urllib.request.Request(
+        f"{base_url}/api/generate",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+            body = resp.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as exc:
+        detail = ""
+        try:
+            detail = exc.read().decode("utf-8", errors="replace")
+        except Exception:
+            detail = str(exc)
+        return None, [f"Eksekusi Ollama direct gagal (HTTP {getattr(exc, 'code', 'error')}): {detail[:500]}"]
+    except Exception as exc:
+        return None, [f"Eksekusi Ollama direct gagal: {exc}"]
+
+    try:
+        raw = json.loads(body)
+    except Exception as exc:
+        return None, [f"Respons Ollama bukan JSON valid: {exc}"]
+
+    output_text = str(raw.get("response") or "").strip() if isinstance(raw, dict) else ""
+    if not output_text and isinstance(raw, dict):
+        output_text = json.dumps(raw)
+
+    json_text = _ekstrak_teks_json(output_text)
+    if not json_text:
+        return None, ["Output Ollama direct tidak berbentuk JSON yang valid."]
+
+    try:
+        data = json.loads(json_text)
+    except Exception as exc:
+        return None, [f"Gagal parse JSON dari output Ollama direct: {exc}"]
+
+    if not isinstance(data, dict):
+        return None, ["Payload Ollama direct bukan object JSON."]
+
+    return data, warnings
+
+
+
 def _jalankan_smolagents(
     request: PlannerAiRequest,
     *,
@@ -499,8 +610,12 @@ def _jalankan_smolagents(
             "atau set OPENAI_API_KEY. Planner AI fallback ke rule-based."
         ]
 
-    if model_id.startswith("ollama/") and not api_base:
-        api_base = "http://localhost:11434"
+    if model_id.startswith("ollama/"):
+        return _jalankan_ollama_direct(
+            request,
+            model_id=model_id,
+            api_base_override=api_base or None,
+        )
 
     try:
         model = _inisialisasi_model_litellm(
@@ -573,6 +688,60 @@ def _retry_default(job_type: str) -> RetryPolicy:
     return RetryPolicy(max_retry=source.max_retry, backoff_sec=list(source.backoff_sec))
 
 
+def _normalisasi_job_type_ai(
+    raw_job_type: Any,
+    item: Dict[str, Any],
+    request: PlannerAiRequest,
+) -> Tuple[str, Optional[str]]:
+    raw = str(raw_job_type or "").strip()
+    normalized = raw.lower()
+
+    mapping = {
+        "monitor": "monitor.channel",
+        "channel": "monitor.channel",
+        "telegram": "monitor.channel",
+        "whatsapp": "monitor.channel",
+        "pantau": "monitor.channel",
+        "report": "report.daily",
+        "laporan": "report.daily",
+        "harian": "report.daily",
+        "daily": "report.daily",
+        "backup": "backup.export",
+        "export": "backup.export",
+        "cadangan": "backup.export",
+        "workflow": "agent.workflow",
+        "agent": "agent.workflow",
+        "alur": "agent.workflow",
+    }
+
+    if normalized in ALLOWED_JOB_TYPES:
+        return normalized, None
+
+    mapped = mapping.get(normalized)
+    if mapped:
+        return mapped, raw
+
+    context_text = " ".join(
+        [
+            normalized,
+            str(item.get("reason") or ""),
+            str(item.get("inputs") or ""),
+            str(request.prompt or ""),
+        ]
+    ).lower()
+
+    if any(token in context_text for token in ["telegram", "whatsapp", "channel", "monitor", "pantau"]):
+        return "monitor.channel", raw
+    if any(token in context_text for token in ["report", "laporan", "harian", "daily"]):
+        return "report.daily", raw
+    if any(token in context_text for token in ["backup", "export", "cadangan"]):
+        return "backup.export", raw
+    if any(token in context_text for token in ["workflow", "agent", "alur"]):
+        return "agent.workflow", raw
+
+    return raw, None
+
+
 def build_plan_from_ai_payload(request: PlannerAiRequest, payload: Dict[str, Any]) -> PlannerResponse:
     normalized_prompt = _normalisasi_teks(request.prompt)
     assumptions: List[str] = []
@@ -593,9 +762,14 @@ def build_plan_from_ai_payload(request: PlannerAiRequest, payload: Dict[str, Any
             warnings.append(f"Item jobs #{index + 1} bukan object, dilewati.")
             continue
 
-        job_type = str(item.get("type") or "").strip()
+        raw_job_type = str(item.get("type") or "").strip()
+        job_type, mapped_from = _normalisasi_job_type_ai(raw_job_type, item, request)
+        if raw_job_type and mapped_from is not None and raw_job_type != job_type:
+            warnings.append(
+                f"Job #{index + 1}: type '{raw_job_type}' dinormalisasi menjadi '{job_type}'."
+            )
         if job_type not in ALLOWED_JOB_TYPES:
-            warnings.append(f"Job #{index + 1}: type '{job_type}' tidak didukung, dilewati.")
+            warnings.append(f"Job #{index + 1}: type '{raw_job_type}' tidak didukung, dilewati.")
             continue
 
         reason = str(item.get("reason") or f"Dibuat oleh planner AI untuk type {job_type}.")
