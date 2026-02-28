@@ -648,23 +648,101 @@ def _jalankan_smolagents(
     return payload, warnings
 
 
+def _jadwal_dari_teks(raw_text: str) -> Optional[Schedule]:
+    text = re.sub(r"\s+", " ", str(raw_text or "").strip().lower())
+    if not text:
+        return None
+
+    if text in {"none", "null", "manual", "on demand", "ondemand", "sekali"}:
+        return None
+
+    if re.match(r"^(\S+\s+){4}\S+$", text):
+        try:
+            return Schedule(cron=text)
+        except Exception:
+            return None
+
+    jam = re.search(r"\b([01]?\d|2[0-3])[:.]([0-5]\d)\b", text)
+    if jam:
+        hour = int(jam.group(1))
+        minute = int(jam.group(2))
+        return Schedule(cron=f"{minute} {hour} * * *")
+
+    pola_interval = [
+        (r"(\d+)\s*(detik|sec|second|seconds|s)\b", 1),
+        (r"(\d+)\s*(menit|minute|minutes|min|m)\b", 60),
+        (r"(\d+)\s*(jam|hour|hours|h)\b", 3600),
+    ]
+    for pola, pengali in pola_interval:
+        match = re.search(pola, text)
+        if match:
+            nilai = max(1, int(match.group(1))) * pengali
+            return Schedule(interval_sec=nilai)
+
+    if any(token in text for token in ["harian", "daily", "tiap hari", "setiap hari"]):
+        return Schedule(cron="0 7 * * *")
+    if any(token in text for token in ["mingguan", "weekly", "per minggu", "setiap minggu"]):
+        return Schedule(cron="0 2 * * 1")
+
+    return None
+
+
 def _paksa_jadwal(raw: Any, warnings: List[str], index: int) -> Optional[Schedule]:
+    if raw is None:
+        return None
+
+    if isinstance(raw, (int, float)):
+        try:
+            return Schedule(interval_sec=max(1, int(raw)))
+        except Exception:
+            warnings.append(f"Job #{index + 1}: interval schedule tidak valid, pakai default.")
+            return None
+
+    if isinstance(raw, str):
+        parsed = _jadwal_dari_teks(raw)
+        if parsed is not None:
+            return parsed
+        if raw.strip():
+            warnings.append(f"Job #{index + 1}: format schedule string tidak dikenali, pakai default.")
+        return None
+
     if not isinstance(raw, dict):
         warnings.append(f"Job #{index + 1}: schedule tidak valid, pakai default.")
         return None
 
     cron = raw.get("cron")
+    if cron is None:
+        cron = raw.get("cron_expr") or raw.get("expression")
+
     interval_sec = raw.get("interval_sec")
+    if interval_sec is None:
+        for key in ["interval", "interval_seconds", "every_sec", "every_seconds"]:
+            if raw.get(key) is not None:
+                interval_sec = raw.get(key)
+                break
+
     if cron is None and interval_sec is None:
-        warnings.append(f"Job #{index + 1}: schedule kosong, pakai default.")
+        text_candidate = raw.get("text") or raw.get("value") or raw.get("when") or raw.get("time")
+        if text_candidate is not None:
+            parsed = _jadwal_dari_teks(str(text_candidate))
+            if parsed is not None:
+                return parsed
         return None
+
+    if isinstance(cron, str):
+        cron = cron.strip() or None
 
     if interval_sec is not None:
         try:
             interval_sec = int(interval_sec)
+            if interval_sec <= 0:
+                raise ValueError("interval must be positive")
         except Exception:
             warnings.append(f"Job #{index + 1}: interval_sec tidak valid, diabaikan.")
             interval_sec = None
+
+    if cron is None and interval_sec is None:
+        return None
 
     try:
         return Schedule(cron=cron, interval_sec=interval_sec)

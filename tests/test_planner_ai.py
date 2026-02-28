@@ -91,6 +91,78 @@ def test_build_plan_from_ai_payload_supports_agent_workflow_type():
     assert job.inputs["prompt"] == "Sinkron github ke notion"
 
 
+def test_build_plan_from_ai_payload_uses_default_schedule_without_warning_when_null():
+    request = PlannerAiRequest(
+        prompt="monitor dan laporan",
+        timezone="Asia/Jakarta",
+        default_channel="telegram",
+        default_account_id="bot_a01",
+    )
+
+    payload = {
+        "summary": "Rencana dari AI",
+        "jobs": [
+            {
+                "type": "monitor.channel",
+                "reason": "Pantau channel",
+                "schedule": None,
+                "inputs": {},
+            },
+            {
+                "type": "report.daily",
+                "reason": "Laporan harian",
+                "schedule": None,
+                "inputs": {},
+            },
+        ],
+    }
+
+    plan = build_plan_from_ai_payload(request, payload)
+
+    assert len(plan.jobs) == 2
+    assert not any("schedule tidak valid" in warning for warning in plan.warnings)
+    assert plan.jobs[0].job_spec.schedule is not None
+    assert plan.jobs[0].job_spec.schedule.interval_sec == 30
+    assert plan.jobs[1].job_spec.schedule is not None
+    assert plan.jobs[1].job_spec.schedule.cron == "0 7 * * *"
+
+
+def test_build_plan_from_ai_payload_parses_human_readable_schedule_string():
+    request = PlannerAiRequest(
+        prompt="monitor dan laporan",
+        timezone="Asia/Jakarta",
+        default_channel="telegram",
+        default_account_id="bot_a01",
+    )
+
+    payload = {
+        "summary": "Rencana dari AI",
+        "jobs": [
+            {
+                "type": "monitor.channel",
+                "reason": "Pantau channel",
+                "schedule": "setiap 45 detik",
+                "inputs": {},
+            },
+            {
+                "type": "report.daily",
+                "reason": "Laporan harian",
+                "schedule": "harian jam 08:30",
+                "inputs": {},
+            },
+        ],
+    }
+
+    plan = build_plan_from_ai_payload(request, payload)
+
+    assert len(plan.jobs) == 2
+    assert plan.jobs[0].job_spec.schedule is not None
+    assert plan.jobs[0].job_spec.schedule.interval_sec == 45
+    assert plan.jobs[1].job_spec.schedule is not None
+    assert plan.jobs[1].job_spec.schedule.cron == "30 8 * * *"
+    assert not any("format schedule string tidak dikenali" in warning for warning in plan.warnings)
+
+
 def test_resolve_planner_ai_credentials_uses_dashboard_account(monkeypatch):
     async def fake_get_integration_account(provider: str, account_id: str, include_secret: bool = False):
         assert provider == "openai"
@@ -108,6 +180,7 @@ def test_resolve_planner_ai_credentials_uses_dashboard_account(monkeypatch):
 
     monkeypatch.setattr(planner_ai, "get_integration_account", fake_get_integration_account)
     monkeypatch.setattr(planner_ai, "list_integration_accounts", fake_list_integration_accounts)
+    monkeypatch.delenv("PLANNER_AI_PROVIDER_CHAIN", raising=False)
 
     request = PlannerAiRequest(prompt="uji", openai_account_id="default")
     model_id, api_key, warnings = asyncio.run(resolve_planner_ai_credentials(request))
@@ -126,6 +199,7 @@ def test_resolve_planner_ai_credentials_falls_back_to_env(monkeypatch):
 
     monkeypatch.setattr(planner_ai, "get_integration_account", fake_get_integration_account)
     monkeypatch.setattr(planner_ai, "list_integration_accounts", fake_list_integration_accounts)
+    monkeypatch.delenv("PLANNER_AI_PROVIDER_CHAIN", raising=False)
     monkeypatch.setenv("OPENAI_API_KEY", "sk-env")
     monkeypatch.setenv("PLANNER_AI_MODEL", "openai/gpt-4o-mini")
 
@@ -182,6 +256,7 @@ def test_resolve_planner_ai_candidates_auto_falls_back_to_ollama(monkeypatch):
 
     monkeypatch.setattr(planner_ai, "get_integration_account", fake_get_integration_account)
     monkeypatch.setattr(planner_ai, "list_integration_accounts", fake_list_integration_accounts)
+    monkeypatch.delenv("PLANNER_AI_PROVIDER_CHAIN", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
     request = PlannerAiRequest(prompt="uji", ai_provider="auto", ai_account_id="default")
