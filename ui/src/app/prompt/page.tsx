@@ -14,11 +14,38 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { executePlannerPrompt, getIntegrationAccounts, type PlannerExecuteResponse } from "@/lib/api";
 
-const CONTOH_PROMPT = [
-  "Pantau telegram akun bot_a01 tiap 30 detik dan buat laporan harian jam 07:00.",
-  "Pantau whatsapp akun ops_01 tiap 45 detik dan buat laporan harian jam 08:00.",
-  "Buat laporan harian jam 07:30 dan backup harian jam 01:30.",
-  "Sinkron issue terbaru dari github ke notion workspace ops.",
+type PromptTemplate = {
+  id: string;
+  label: string;
+  hint: string;
+  prompt: string;
+};
+
+const PROMPT_TEMPLATES: PromptTemplate[] = [
+  {
+    id: "monitor-report-telegram",
+    label: "Monitor + Report",
+    hint: "Telegram tiap 30 detik + laporan harian.",
+    prompt: "Pantau telegram akun bot_a01 tiap 30 detik dan buat laporan harian jam 07:00.",
+  },
+  {
+    id: "monitor-report-whatsapp",
+    label: "WA Ops + Report",
+    hint: "WhatsApp ops + laporan pagi jam 08:00.",
+    prompt: "Pantau whatsapp akun ops_01 tiap 45 detik dan buat laporan harian jam 08:00.",
+  },
+  {
+    id: "report-backup",
+    label: "Report + Backup",
+    hint: "Laporan + backup harian dengan jadwal terpisah.",
+    prompt: "Buat laporan harian jam 07:30 dan backup harian jam 01:30.",
+  },
+  {
+    id: "workflow-github-notion",
+    label: "Workflow MCP",
+    hint: "Sinkron issue GitHub ke Notion workspace ops.",
+    prompt: "Sinkron issue terbaru dari github ke notion workspace ops.",
+  },
 ];
 
 const clampWaitSeconds = (value: number) => {
@@ -56,7 +83,7 @@ const getRunStatusClass = (status?: "queued" | "running" | "success" | "failed")
 export default function PromptPage() {
   const queryClient = useQueryClient();
 
-  const [prompt, setPrompt] = useState(CONTOH_PROMPT[0]);
+  const [prompt, setPrompt] = useState(PROMPT_TEMPLATES[0].prompt);
   const [useAi, setUseAi] = useState(false);
   const [runImmediately, setRunImmediately] = useState(true);
   const [waitSeconds, setWaitSeconds] = useState(2);
@@ -168,19 +195,29 @@ export default function PromptPage() {
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleSubmit}>
-            <div className="flex flex-wrap gap-2 rounded-lg border border-border bg-muted/30 p-3">
-              {CONTOH_PROMPT.map((item) => (
-                <Button
-                  key={item}
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={submitMutation.isPending}
-                  onClick={() => setPrompt(item)}
-                >
-                  Pakai Contoh
-                </Button>
-              ))}
+            <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
+              <p className="text-xs font-medium text-muted-foreground">Template Cepat</p>
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                {PROMPT_TEMPLATES.map((item) => {
+                  const isActive = prompt.trim() === item.prompt.trim();
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      disabled={submitMutation.isPending}
+                      onClick={() => setPrompt(item.prompt)}
+                      className={`rounded-lg border p-3 text-left transition ${
+                        isActive
+                          ? "border-primary bg-primary/10"
+                          : "border-border bg-card hover:border-primary/40 hover:bg-muted/30"
+                      }`}
+                    >
+                      <p className="text-sm font-medium">{item.label}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{item.hint}</p>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="space-y-2">

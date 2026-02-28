@@ -177,6 +177,64 @@ def _hapus_pesan_low_signal(items: List[str]) -> List[str]:
     return output
 
 
+def _lokalisasi_pesan(text: str) -> str:
+    cleaned = str(text or "").strip()
+    if not cleaned:
+        return ""
+
+    lowered = cleaned.lower().strip()
+
+    direct_map: Dict[str, str] = {
+        "telegram is running and accessible.": "Telegram aktif dan dapat diakses.",
+        "ensure telegram is running and accessible.": "Pastikan Telegram aktif dan dapat diakses.",
+        "ensure the channel is active and accessible.": "Pastikan channel aktif dan dapat diakses.",
+        "verify the api key is valid and accessible.": "Pastikan API key valid dan dapat diakses.",
+        "ensure the telegram account is active and has access to the channel.": (
+            "Pastikan akun Telegram aktif dan memiliki akses ke channel."
+        ),
+    }
+
+    if lowered in direct_map:
+        return direct_map[lowered]
+
+    result = cleaned
+
+    replacements: List[Tuple[str, str]] = [
+        (r"(?i)\bthe user has the necessary permissions to\b", "pengguna memiliki izin untuk"),
+        (r"(?i)\bsend reports\b", "mengirim laporan"),
+        (r"(?i)\bview messages\b", "melihat pesan"),
+        (r"(?i)\bgenerate reports\b", "membuat laporan"),
+        (r"(?i)\bapi key\b", "API key"),
+        (r"(?i)\btelegram\b", "Telegram"),
+        (r"(?i)\bchannel\b", "channel"),
+    ]
+    for pattern, replacement in replacements:
+        result = re.sub(pattern, replacement, result)
+
+    ensure_match = re.match(r"(?i)^\s*ensure\s+(.+?)\.?\s*$", result)
+    if ensure_match:
+        clause = ensure_match.group(1).strip()
+        if clause:
+            return f"Pastikan {clause}."
+
+    verify_match = re.match(r"(?i)^\s*verify\s+(.+?)\.?\s*$", result)
+    if verify_match:
+        clause = verify_match.group(1).strip()
+        if clause:
+            return f"Verifikasi {clause}."
+
+    return result
+
+
+def _lokalisasi_kumpulan_pesan(items: List[str]) -> List[str]:
+    output: List[str] = []
+    for item in items:
+        localized = _lokalisasi_pesan(item)
+        if localized:
+            output.append(localized)
+    return output
+
+
 def _normalisasi_provider(provider: str) -> str:
     cleaned = str(provider or "").strip().lower()
     return cleaned or "auto"
@@ -898,9 +956,15 @@ def build_plan_from_ai_payload(request: PlannerAiRequest, payload: Dict[str, Any
     used_ids: Set[str] = set()
 
     assumptions.extend(
-        _hapus_pesan_low_signal(payload.get("assumptions", []) if isinstance(payload.get("assumptions"), list) else [])
+        _lokalisasi_kumpulan_pesan(
+            _hapus_pesan_low_signal(payload.get("assumptions", []) if isinstance(payload.get("assumptions"), list) else [])
+        )
     )
-    warnings.extend(_hapus_pesan_low_signal(payload.get("warnings", []) if isinstance(payload.get("warnings"), list) else []))
+    warnings.extend(
+        _lokalisasi_kumpulan_pesan(
+            _hapus_pesan_low_signal(payload.get("warnings", []) if isinstance(payload.get("warnings"), list) else [])
+        )
+    )
 
     raw_jobs = payload.get("jobs")
     if not isinstance(raw_jobs, list):
@@ -923,11 +987,11 @@ def build_plan_from_ai_payload(request: PlannerAiRequest, payload: Dict[str, Any
             continue
 
         reason = str(item.get("reason") or f"Dibuat oleh planner AI untuk type {job_type}.")
-        item_assumptions = _hapus_pesan_low_signal(
-            item.get("assumptions", []) if isinstance(item.get("assumptions"), list) else []
+        item_assumptions = _lokalisasi_kumpulan_pesan(
+            _hapus_pesan_low_signal(item.get("assumptions", []) if isinstance(item.get("assumptions"), list) else [])
         )
-        item_warnings = _hapus_pesan_low_signal(
-            item.get("warnings", []) if isinstance(item.get("warnings"), list) else []
+        item_warnings = _lokalisasi_kumpulan_pesan(
+            _hapus_pesan_low_signal(item.get("warnings", []) if isinstance(item.get("warnings"), list) else [])
         )
 
         if job_type == "agent.workflow":
@@ -1004,8 +1068,8 @@ def build_plan_from_ai_payload(request: PlannerAiRequest, payload: Dict[str, Any
         assumptions.extend(job.assumptions)
         warnings.extend(job.warnings)
 
-    assumptions = _hapus_duplikat(_hapus_pesan_low_signal(assumptions))
-    warnings = _hapus_duplikat(_hapus_pesan_low_signal(warnings))
+    assumptions = _hapus_duplikat(_lokalisasi_kumpulan_pesan(_hapus_pesan_low_signal(assumptions)))
+    warnings = _hapus_duplikat(_lokalisasi_kumpulan_pesan(_hapus_pesan_low_signal(warnings)))
 
     summary = str(payload.get("summary") or f"Planner AI menghasilkan {len(jobs)} rencana tugas.")
     if not jobs:
@@ -1031,7 +1095,7 @@ def build_plan_with_ai(
     pre_warnings: Optional[List[str]] = None,
 ) -> PlannerResponse:
     fallback_plan = build_plan_from_prompt(request)
-    warning_awal = _hapus_duplikat(_hapus_pesan_low_signal(list(pre_warnings or [])))
+    warning_awal = _hapus_duplikat(_lokalisasi_kumpulan_pesan(_hapus_pesan_low_signal(list(pre_warnings or []))))
 
     if request.force_rule_based:
         fallback_plan.warnings = _hapus_duplikat(
@@ -1045,7 +1109,9 @@ def build_plan_with_ai(
         api_key_override=api_key_override,
         api_base_override=api_base_override,
     )
-    gabung_warning_ai = _hapus_duplikat(_hapus_pesan_low_signal([*warning_awal, *ai_warnings]))
+    gabung_warning_ai = _hapus_duplikat(
+        _lokalisasi_kumpulan_pesan(_hapus_pesan_low_signal([*warning_awal, *ai_warnings]))
+    )
     if payload is None:
         fallback_plan.warnings = _hapus_duplikat(
             [
@@ -1082,7 +1148,7 @@ async def build_plan_with_ai_dari_dashboard(request: PlannerAiRequest) -> Planne
         )
         return fallback_plan
 
-    warning_terkumpul = _hapus_duplikat(_hapus_pesan_low_signal(list(warnings_awal)))
+    warning_terkumpul = _hapus_duplikat(_lokalisasi_kumpulan_pesan(_hapus_pesan_low_signal(list(warnings_awal))))
     if not kandidat:
         fallback_plan.warnings = _hapus_duplikat(
             [
@@ -1174,7 +1240,9 @@ async def build_plan_with_ai_dari_dashboard(request: PlannerAiRequest) -> Planne
             ai_plan = build_plan_from_ai_payload(request, payload)
             if ai_plan.jobs:
                 ai_plan.warnings = _hapus_duplikat(
-                    _hapus_pesan_low_signal([*ai_plan.warnings, *warning_terkumpul, *warnings_ai])
+                    _lokalisasi_kumpulan_pesan(
+                        _hapus_pesan_low_signal([*ai_plan.warnings, *warning_terkumpul, *warnings_ai])
+                    )
                 )
                 return ai_plan
 

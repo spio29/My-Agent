@@ -231,6 +231,37 @@ def test_build_plan_from_ai_payload_enriches_missing_intent_jobs():
     assert any("melengkapi output AI" in warning for warning in plan.warnings)
 
 
+def test_build_plan_from_ai_payload_localizes_business_warnings_to_indonesian():
+    request = PlannerAiRequest(
+        prompt="monitor telegram",
+        timezone="Asia/Jakarta",
+        default_channel="telegram",
+        default_account_id="bot_a01",
+    )
+
+    payload = {
+        "summary": "Rencana dari AI",
+        "warnings": [
+            "Ensure the user has the necessary permissions to send reports.",
+            "Telegram is running and accessible.",
+        ],
+        "jobs": [
+            {
+                "type": "monitor.channel",
+                "reason": "Pantau channel",
+                "schedule": None,
+                "inputs": {},
+            }
+        ],
+    }
+
+    plan = build_plan_from_ai_payload(request, payload)
+
+    assert any("Pastikan pengguna memiliki izin untuk mengirim laporan." in item for item in plan.warnings)
+    assert any("Telegram aktif dan dapat diakses." in item for item in plan.warnings)
+    assert not any("Ensure the user has the necessary permissions to send reports." in item for item in plan.warnings)
+
+
 def test_resolve_planner_ai_credentials_uses_dashboard_account(monkeypatch):
     async def fake_get_integration_account(provider: str, account_id: str, include_secret: bool = False):
         assert provider == "openai"
