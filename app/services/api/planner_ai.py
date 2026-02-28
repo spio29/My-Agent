@@ -904,7 +904,6 @@ def _lengkapi_job_dari_intent_prompt(
     request: PlannerAiRequest,
     jobs: List[PlannerJob],
     used_ids: Set[str],
-    warnings: List[str],
 ) -> None:
     # Hanya melengkapi intent operasional inti agar output AI model kecil tetap konsisten.
     tipe_yang_boleh_ditambah = {"monitor.channel", "report.daily", "backup.export"}
@@ -926,7 +925,6 @@ def _lengkapi_job_dari_intent_prompt(
         return
 
     existing_types: Set[str] = {str(job.job_spec.type or "").strip() for job in jobs}
-    added_count = 0
     for rule_job in rule_plan.jobs:
         tipe = str(rule_job.job_spec.type or "").strip()
         if tipe not in target_types or tipe in existing_types:
@@ -940,12 +938,6 @@ def _lengkapi_job_dari_intent_prompt(
 
         jobs.append(copied)
         existing_types.add(tipe)
-        added_count += 1
-
-    if added_count > 0:
-        warnings.append(
-            f"Planner menambahkan {added_count} job dari intent prompt untuk melengkapi output AI."
-        )
 
 
 def build_plan_from_ai_payload(request: PlannerAiRequest, payload: Dict[str, Any]) -> PlannerResponse:
@@ -1063,7 +1055,7 @@ def build_plan_from_ai_payload(request: PlannerAiRequest, payload: Dict[str, Any
             )
         )
 
-    _lengkapi_job_dari_intent_prompt(request, jobs, used_ids, warnings)
+    _lengkapi_job_dari_intent_prompt(request, jobs, used_ids)
 
     for job in jobs:
         assumptions.extend(job.assumptions)

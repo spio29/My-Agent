@@ -228,7 +228,7 @@ def test_build_plan_from_ai_payload_enriches_missing_intent_jobs():
 
     assert "monitor.channel" in job_types
     assert "report.daily" in job_types
-    assert any("melengkapi output AI" in warning for warning in plan.warnings)
+    assert not any("melengkapi output AI" in warning for warning in plan.warnings)
 
 
 def test_build_plan_from_ai_payload_no_warning_for_common_type_alias():
