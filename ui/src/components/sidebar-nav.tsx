@@ -9,8 +9,8 @@ const navItems = [
   { href: "/", label: "Home", icon: Gauge },
   { href: "/memory", label: "Memory", icon: Brain },
   { href: "/armory", label: "Armory", icon: Sword },
-  { href: "/automation", label: "Branch", icon: ShieldCheck },
-  { href: "/settings", label: "Control", icon: Settings2 },
+  { href: "/automation", label: "Automation", icon: ShieldCheck },
+  { href: "/settings", label: "Settings", icon: Settings2 },
 ];
 
 export default function SidebarNav({ compact = false }) {

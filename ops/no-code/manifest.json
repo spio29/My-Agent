@@ -1,0 +1,236 @@
+{
+  "version": "2026-03-01",
+  "framework": "spio-no-code-social-wa",
+  "description": "Scaffold no-code untuk 10 influencer dengan command center siap ON/OFF/strategi/jadwal/chain.",
+  "influencers": [
+    {
+      "id": "inf_001",
+      "model": "endorse",
+      "name": "Influencer Endorse 01",
+      "channels_active": [
+        "fb",
+        "ig",
+        "wa"
+      ],
+      "accounts": {
+        "instagram": "ig_001",
+        "facebook": "fb_001",
+        "whatsapp": "wa_001"
+      },
+      "jobs": [
+        "tmpl_inf_001_ig_reply",
+        "tmpl_inf_001_ig_post",
+        "tmpl_inf_001_fb_reply",
+        "tmpl_inf_001_fb_post",
+        "tmpl_inf_001_wa_followup",
+        "tmpl_inf_001_report"
+      ]
+    },
+    {
+      "id": "inf_002",
+      "model": "product",
+      "name": "Influencer Product 02",
+      "channels_active": [
+        "ig",
+        "fb"
+      ],
+      "accounts": {
+        "instagram": "ig_002",
+        "facebook": "fb_002",
+        "whatsapp": "wa_002"
+      },
+      "jobs": [
+        "tmpl_inf_002_ig_reply",
+        "tmpl_inf_002_ig_post",
+        "tmpl_inf_002_fb_reply",
+        "tmpl_inf_002_fb_post",
+        "tmpl_inf_002_wa_followup",
+        "tmpl_inf_002_report"
+      ]
+    },
+    {
+      "id": "inf_003",
+      "model": "product",
+      "name": "Influencer Product 03",
+      "channels_active": [
+        "fb",
+        "ig",
+        "wa"
+      ],
+      "accounts": {
+        "instagram": "ig_003",
+        "facebook": "fb_003",
+        "whatsapp": "wa_003"
+      },
+      "jobs": [
+        "tmpl_inf_003_ig_reply",
+        "tmpl_inf_003_ig_post",
+        "tmpl_inf_003_fb_reply",
+        "tmpl_inf_003_fb_post",
+        "tmpl_inf_003_wa_followup",
+        "tmpl_inf_003_report"
+      ]
+    },
+    {
+      "id": "inf_004",
+      "model": "product",
+      "name": "Influencer Product 04",
+      "channels_active": [
+        "fb",
+        "ig",
+        "wa"
+      ],
+      "accounts": {
+        "instagram": "ig_004",
+        "facebook": "fb_004",
+        "whatsapp": "wa_004"
+      },
+      "jobs": [
+        "tmpl_inf_004_ig_reply",
+        "tmpl_inf_004_ig_post",
+        "tmpl_inf_004_fb_reply",
+        "tmpl_inf_004_fb_post",
+        "tmpl_inf_004_wa_followup",
+        "tmpl_inf_004_report"
+      ]
+    },
+    {
+      "id": "inf_005",
+      "model": "product",
+      "name": "Influencer Product 05",
+      "channels_active": [
+        "fb",
+        "ig",
+        "wa"
+      ],
+      "accounts": {
+        "instagram": "ig_005",
+        "facebook": "fb_005",
+        "whatsapp": "wa_005"
+      },
+      "jobs": [
+        "tmpl_inf_005_ig_reply",
+        "tmpl_inf_005_ig_post",
+        "tmpl_inf_005_fb_reply",
+        "tmpl_inf_005_fb_post",
+        "tmpl_inf_005_wa_followup",
+        "tmpl_inf_005_report"
+      ]
+    },
+    {
+      "id": "inf_006",
+      "model": "product",
+      "name": "Influencer Product 06",
+      "channels_active": [
+        "fb",
+        "ig",
+        "wa"
+      ],
+      "accounts": {
+        "instagram": "ig_006",
+        "facebook": "fb_006",
+        "whatsapp": "wa_006"
+      },
+      "jobs": [
+        "tmpl_inf_006_ig_reply",
+        "tmpl_inf_006_ig_post",
+        "tmpl_inf_006_fb_reply",
+        "tmpl_inf_006_fb_post",
+        "tmpl_inf_006_wa_followup",
+        "tmpl_inf_006_report"
+      ]
+    },
+    {
+      "id": "inf_007",
+      "model": "product",
+      "name": "Influencer Product 07",
+      "channels_active": [
+        "fb",
+        "ig",
+        "wa"
+      ],
+      "accounts": {
+        "instagram": "ig_007",
+        "facebook": "fb_007",
+        "whatsapp": "wa_007"
+      },
+      "jobs": [
+        "tmpl_inf_007_ig_reply",
+        "tmpl_inf_007_ig_post",
+        "tmpl_inf_007_fb_reply",
+        "tmpl_inf_007_fb_post",
+        "tmpl_inf_007_wa_followup",
+        "tmpl_inf_007_report"
+      ]
+    },
+    {
+      "id": "inf_008",
+      "model": "product",
+      "name": "Influencer Product 08",
+      "channels_active": [
+        "fb",
+        "ig",
+        "wa"
+      ],
+      "accounts": {
+        "instagram": "ig_008",
+        "facebook": "fb_008",
+        "whatsapp": "wa_008"
+      },
+      "jobs": [
+        "tmpl_inf_008_ig_reply",
+        "tmpl_inf_008_ig_post",
+        "tmpl_inf_008_fb_reply",
+        "tmpl_inf_008_fb_post",
+        "tmpl_inf_008_wa_followup",
+        "tmpl_inf_008_report"
+      ]
+    },
+    {
+      "id": "inf_009",
+      "model": "product",
+      "name": "Influencer Product 09",
+      "channels_active": [
+        "fb",
+        "ig",
+        "wa"
+      ],
+      "accounts": {
+        "instagram": "ig_009",
+        "facebook": "fb_009",
+        "whatsapp": "wa_009"
+      },
+      "jobs": [
+        "tmpl_inf_009_ig_reply",
+        "tmpl_inf_009_ig_post",
+        "tmpl_inf_009_fb_reply",
+        "tmpl_inf_009_fb_post",
+        "tmpl_inf_009_wa_followup",
+        "tmpl_inf_009_report"
+      ]
+    },
+    {
+      "id": "inf_010",
+      "model": "product",
+      "name": "Influencer Product 10",
+      "channels_active": [
+        "fb",
+        "ig",
+        "wa"
+      ],
+      "accounts": {
+        "instagram": "ig_010",
+        "facebook": "fb_010",
+        "whatsapp": "wa_010"
+      },
+      "jobs": [
+        "tmpl_inf_010_ig_reply",
+        "tmpl_inf_010_ig_post",
+        "tmpl_inf_010_fb_reply",
+        "tmpl_inf_010_fb_post",
+        "tmpl_inf_010_wa_followup",
+        "tmpl_inf_010_report"
+      ]
+    }
+  ]
+}

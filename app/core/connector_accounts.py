@@ -117,6 +117,11 @@ async def upsert_telegram_account(account_id: str, payload: Dict[str, Any]) -> D
 
     default_account_id = str(payload.get("default_account_id", existing.get("default_account_id", "default")) or "").strip()
     default_account_id = default_account_id or "default"
+    default_branch_id = str(payload.get("default_branch_id", existing.get("default_branch_id", "br_01")) or "").strip().lower()
+    default_branch_id = default_branch_id or "br_01"
+    inbound_followup_template = str(
+        payload.get("inbound_followup_template", existing.get("inbound_followup_template", "")) or ""
+    ).strip()
 
     now = _sekarang_iso()
     row = {
@@ -131,6 +136,10 @@ async def upsert_telegram_account(account_id: str, payload: Dict[str, Any]) -> D
         "timezone": timezone_value,
         "default_channel": default_channel,
         "default_account_id": default_account_id,
+        "default_branch_id": default_branch_id,
+        "capture_inbound_text": bool(payload.get("capture_inbound_text", existing.get("capture_inbound_text", False))),
+        "inbound_auto_followup": bool(payload.get("inbound_auto_followup", existing.get("inbound_auto_followup", True))),
+        "inbound_followup_template": inbound_followup_template,
         "created_at": existing.get("created_at", now),
         "updated_at": now,
     }

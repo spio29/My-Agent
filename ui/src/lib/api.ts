@@ -6,6 +6,11 @@ const API_AUTH_HEADER = process.env.NEXT_PUBLIC_API_AUTH_HEADER || "Authorizatio
 const API_AUTH_SCHEME = process.env.NEXT_PUBLIC_API_AUTH_SCHEME || "Bearer";
 const API_AUTH_TOKEN_ENV = process.env.NEXT_PUBLIC_API_TOKEN || "";
 
+const resolveApiBase = (): string => {
+  const configured = String(API_BASE || "").trim() || "/api";
+  return configured.startsWith("/") ? configured : configured.replace(/\/+$/, "");
+};
+
 export interface JobSpec {
   job_id: string;
   type: string;
@@ -81,6 +86,10 @@ export interface TelegramConnectorAccount {
   timezone: string;
   default_channel: string;
   default_account_id: string;
+  default_branch_id?: string;
+  capture_inbound_text?: boolean;
+  inbound_auto_followup?: boolean;
+  inbound_followup_template?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -96,6 +105,10 @@ export interface TelegramConnectorAccountUpsertRequest {
   timezone: string;
   default_channel: string;
   default_account_id: string;
+  default_branch_id?: string;
+  capture_inbound_text?: boolean;
+  inbound_auto_followup?: boolean;
+  inbound_followup_template?: string;
 }
 
 export interface McpIntegrationServer {
@@ -549,7 +562,7 @@ export const clearApiAuthToken = (): void => {
 export const getApiAuthToken = (): string => resolveApiToken();
 
 const getJson = async <T>(path: string): Promise<T> => {
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(`${resolveApiBase()}${path}`, {
     headers: buildHeaders(false),
   });
   if (!response.ok) {
@@ -558,8 +571,8 @@ const getJson = async <T>(path: string): Promise<T> => {
   return (await response.json()) as T;
 };
 
-const send = async <T>(path: string, method: "POST" | "PUT" | "DELETE", body?: unknown): Promise<T> => {
-  const response = await fetch(`${API_BASE}${path}`, {
+const send = async <T>(path: string, method: "POST" | "PUT" | "PATCH" | "DELETE", body?: unknown): Promise<T> => {
+  const response = await fetch(`${resolveApiBase()}${path}`, {
     method,
     headers: buildHeaders(Boolean(body)),
     body: body ? JSON.stringify(body) : undefined,
@@ -799,7 +812,7 @@ export const fireTriggerWebhook = async (
   payload: Record<string, unknown>,
   secret?: string,
 ): Promise<TriggerFireResponse> => {
-  const response = await fetch(`${API_BASE}/connectors/webhook/${encodeURIComponent(triggerId)}`, {
+  const response = await fetch(`${resolveApiBase()}/connectors/webhook/${encodeURIComponent(triggerId)}`, {
     method: "POST",
     headers: buildTriggerHeaders(true, secret),
     body: JSON.stringify(payload),
@@ -812,7 +825,7 @@ export const fireTriggerTelegram = async (
   data: { chat_id: string; text: string; username?: string },
   secret?: string,
 ): Promise<TriggerFireResponse> => {
-  const response = await fetch(`${API_BASE}/connectors/telegram/${encodeURIComponent(triggerId)}`, {
+  const response = await fetch(`${resolveApiBase()}/connectors/telegram/${encodeURIComponent(triggerId)}`, {
     method: "POST",
     headers: buildTriggerHeaders(true, secret),
     body: JSON.stringify(data),
@@ -825,7 +838,7 @@ export const fireTriggerEmail = async (
   data: { sender: string; subject: string; body: string },
   secret?: string,
 ): Promise<TriggerFireResponse> => {
-  const response = await fetch(`${API_BASE}/connectors/email/${encodeURIComponent(triggerId)}`, {
+  const response = await fetch(`${resolveApiBase()}/connectors/email/${encodeURIComponent(triggerId)}`, {
     method: "POST",
     headers: buildTriggerHeaders(true, secret),
     body: JSON.stringify(data),
@@ -838,7 +851,7 @@ export const fireTriggerSlack = async (
   data: { channel_id: string; user_id: string; command: string; text: string; response_url?: string },
   secret?: string,
 ): Promise<TriggerFireResponse> => {
-  const response = await fetch(`${API_BASE}/connectors/slack/${encodeURIComponent(triggerId)}`, {
+  const response = await fetch(`${resolveApiBase()}/connectors/slack/${encodeURIComponent(triggerId)}`, {
     method: "POST",
     headers: buildTriggerHeaders(true, secret),
     body: JSON.stringify(data),
@@ -851,7 +864,7 @@ export const fireTriggerSms = async (
   data: { phone_number: string; message: string },
   secret?: string,
 ): Promise<TriggerFireResponse> => {
-  const response = await fetch(`${API_BASE}/connectors/sms/${encodeURIComponent(triggerId)}`, {
+  const response = await fetch(`${resolveApiBase()}/connectors/sms/${encodeURIComponent(triggerId)}`, {
     method: "POST",
     headers: buildTriggerHeaders(true, secret),
     body: JSON.stringify(data),
@@ -864,7 +877,7 @@ export const fireTriggerVoice = async (
   data: { caller: string; transcript: string; call_id?: string },
   secret?: string,
 ): Promise<TriggerFireResponse> => {
-  const response = await fetch(`${API_BASE}/connectors/voice/${encodeURIComponent(triggerId)}`, {
+  const response = await fetch(`${resolveApiBase()}/connectors/voice/${encodeURIComponent(triggerId)}`, {
     method: "POST",
     headers: buildTriggerHeaders(true, secret),
     body: JSON.stringify(data),
@@ -1045,8 +1058,8 @@ export const resetAgentMemory = async (agentKey: string): Promise<AgentMemoryRes
 export const checkHealth = async () => {
   try {
     const [healthResponse, readyResponse] = await Promise.all([
-      fetch(`${API_BASE}/healthz`),
-      fetch(`${API_BASE}/readyz`),
+      fetch(`${resolveApiBase()}/healthz`),
+      fetch(`${resolveApiBase()}/readyz`),
     ]);
 
     return {
@@ -1168,6 +1181,87 @@ export interface Squad {
   closer_job_id?: string;
 }
 
+export interface InfluencerTemplate {
+  template_id: string;
+  name: string;
+  mode: "endorse" | "product" | "hybrid" | string;
+  description: string;
+  enabled: boolean;
+  default_branch_id: string;
+  branch_blueprint_id: string;
+  channels_required: string[];
+  job_templates: Record<string, unknown>[];
+  metadata: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface InfluencerProfile {
+  influencer_id: string;
+  name: string;
+  niche: string;
+  mode: "endorse" | "product" | "hybrid" | string;
+  status: string;
+  template_id: string;
+  branch_id: string;
+  channels: Record<string, string>;
+  offer_name: string;
+  offer_price: number;
+  metadata: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CloneInfluencerTemplateRequest {
+  influencer_id?: string;
+  name: string;
+  niche?: string;
+  mode?: "endorse" | "product" | "hybrid" | string;
+  branch_id?: string;
+  channels?: Record<string, string>;
+  offer_name?: string;
+  offer_price?: number;
+  metadata?: Record<string, unknown>;
+  enable_jobs?: boolean;
+  overwrite_existing_jobs?: boolean;
+}
+
+export interface CloneInfluencerJobResult {
+  job_id: string;
+  type: string;
+  enabled: boolean;
+  status: "created" | "updated" | "skipped_existing" | string;
+}
+
+export interface CloneInfluencerTemplateResponse {
+  template_id: string;
+  influencer: InfluencerProfile;
+  jobs: CloneInfluencerJobResult[];
+  status: "ok" | string;
+}
+
+export interface UpdateInfluencerProfileRequest {
+  name?: string;
+  niche?: string;
+  mode?: "endorse" | "product" | "hybrid" | string;
+  status?: string;
+  template_id?: string;
+  branch_id?: string;
+  channels?: Record<string, string>;
+  offer_name?: string;
+  offer_price?: number;
+  metadata?: Record<string, unknown>;
+  apply_template_jobs?: boolean;
+  enable_jobs?: boolean;
+  overwrite_existing_jobs?: boolean;
+}
+
+export interface UpdateInfluencerProfileResponse {
+  influencer: InfluencerProfile;
+  jobs: CloneInfluencerJobResult[];
+  status: "ok" | string;
+}
+
 export interface Branch {
   branch_id: string;
   name: string;
@@ -1186,11 +1280,106 @@ export interface Branch {
   metadata: Record<string, any>;
 }
 
+export interface SalesInboundRequest {
+  branch_id: string;
+  channel: string;
+  contact_id: string;
+  name?: string;
+  source?: string;
+  offer?: string;
+  owner?: string;
+  message?: string;
+  value_estimate?: number;
+  tags?: string[];
+  stage?: string;
+  auto_followup?: boolean;
+  account_id?: string;
+  followup_template?: string;
+  next_followup_minutes?: number;
+}
+
+export interface SalesInboundResponse {
+  status: string;
+  action: "created" | "updated" | string;
+  prospect_id: string;
+  branch_id: string;
+  channel: string;
+  contact_id: string;
+  followup_queued: boolean;
+  run_id?: string;
+}
+
 export const getBranches = async (): Promise<Branch[]> => {
   try {
     return await getJson<Branch[]>("/branches");
   } catch (error) {
     return handleApiError(error, "Gagal memuat unit bisnis", []);
+  }
+};
+
+export const submitSalesInbound = async (
+  payload: SalesInboundRequest,
+): Promise<SalesInboundResponse | undefined> => {
+  try {
+    return await send<SalesInboundResponse>("/sales/inbound", "POST", payload);
+  } catch (error) {
+    return handleApiError(error, "Gagal memproses inbound sales", undefined);
+  }
+};
+
+export const getInfluencerTemplates = async (limit = 200): Promise<InfluencerTemplate[]> => {
+  try {
+    const query = new URLSearchParams({ limit: String(limit) });
+    return await getJson<InfluencerTemplate[]>(`/influencer/templates?${query.toString()}`);
+  } catch (error) {
+    return handleApiError(error, "Gagal memuat template influencer", []);
+  }
+};
+
+export const getInfluencerProfiles = async (limit = 200): Promise<InfluencerProfile[]> => {
+  try {
+    const query = new URLSearchParams({ limit: String(limit) });
+    return await getJson<InfluencerProfile[]>(`/influencer/profiles?${query.toString()}`);
+  } catch (error) {
+    return handleApiError(error, "Gagal memuat profile influencer", []);
+  }
+};
+
+export const getInfluencerProfile = async (influencerId: string): Promise<InfluencerProfile | undefined> => {
+  try {
+    return await getJson<InfluencerProfile>(`/influencer/profiles/${encodeURIComponent(influencerId)}`);
+  } catch (error) {
+    return handleApiError(error, "Gagal memuat profile influencer", undefined);
+  }
+};
+
+export const cloneInfluencerFromTemplate = async (
+  templateId: string,
+  payload: CloneInfluencerTemplateRequest,
+): Promise<CloneInfluencerTemplateResponse | undefined> => {
+  try {
+    return await send<CloneInfluencerTemplateResponse>(
+      `/influencer/templates/${encodeURIComponent(templateId)}/clone`,
+      "POST",
+      payload,
+    );
+  } catch (error) {
+    return handleApiError(error, "Gagal clone template influencer", undefined);
+  }
+};
+
+export const updateInfluencerProfile = async (
+  influencerId: string,
+  payload: UpdateInfluencerProfileRequest,
+): Promise<UpdateInfluencerProfileResponse | undefined> => {
+  try {
+    return await send<UpdateInfluencerProfileResponse>(
+      `/influencer/profiles/${encodeURIComponent(influencerId)}`,
+      "PATCH",
+      payload,
+    );
+  } catch (error) {
+    return handleApiError(error, "Gagal update profile influencer", undefined);
   }
 };
 

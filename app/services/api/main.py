@@ -1,9 +1,10 @@
 import asyncio
 import json
 import os
+import re
 import uuid
 from contextlib import suppress
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -30,6 +31,27 @@ from app.core.connector_accounts import (
     get_telegram_account,
     list_telegram_accounts,
     upsert_telegram_account,
+)
+from app.core.prospects import (
+    create_prospect,
+    find_open_prospect_by_contact,
+    get_prospect,
+    list_prospects,
+    mark_prospect_lost,
+    mark_prospect_won,
+    normalize_prospect_channel,
+    update_prospect,
+)
+from app.core.influencers import (
+    get_influencer,
+    list_influencers,
+    upsert_influencer,
+)
+from app.core.influencer_templates import (
+    ensure_default_templates as ensure_default_influencer_templates,
+    get_template as get_influencer_template,
+    list_templates as list_influencer_templates,
+    upsert_template as upsert_influencer_template,
 )
 from app.core.agent_memory import (
     build_agent_memory_context,
@@ -293,6 +315,52 @@ def _sekarang_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+async def _queue_custom_job_run(
+    *,
+    job_id: str,
+    job_type: str,
+    inputs: Dict[str, Any],
+    timeout_ms: int = 30000,
+    agent_pool: Optional[str] = None,
+    priority: int = 0,
+    source: str = "api.custom",
+) -> Dict[str, str]:
+    run_id = f"run_{int(datetime.now(timezone.utc).timestamp())}_{uuid.uuid4().hex[:8]}"
+    trace_id = f"trace_{uuid.uuid4().hex}"
+
+    data_run = Run(
+        run_id=run_id,
+        job_id=job_id,
+        status=RunStatus.QUEUED,
+        attempt=0,
+        scheduled_at=datetime.now(timezone.utc),
+        inputs=inputs,
+        trace_id=trace_id,
+        agent_pool=agent_pool,
+    )
+    await save_run(data_run)
+    await add_run_to_job_history(job_id, run_id)
+
+    event_antrean = QueueEvent(
+        run_id=run_id,
+        job_id=job_id,
+        type=job_type,
+        inputs=inputs,
+        attempt=0,
+        scheduled_at=_sekarang_iso(),
+        timeout_ms=int(timeout_ms),
+        trace_id=trace_id,
+        agent_pool=agent_pool,
+        priority=int(priority),
+    )
+    await enqueue_job(event_antrean)
+    await append_event(
+        "run.queued",
+        {"run_id": run_id, "job_id": job_id, "job_type": job_type, "source": source},
+    )
+    return {"run_id": run_id, "job_id": job_id, "status": "queued"}
+
+
 def _fallback_payload(endpoint: str, payload: Any) -> Any:
     logger.warning("Serving degraded fallback payload", extra={"endpoint": endpoint})
     return payload
@@ -304,6 +372,78 @@ def _merge_config_defaults(existing: Dict[str, Any], defaults: Dict[str, Any], o
         if overwrite or key not in merged:
             merged[key] = value
     return merged
+
+
+_SLUG_RE = re.compile(r"[^a-z0-9]+")
+_TEMPLATE_TOKEN_RE = re.compile(r"{([a-zA-Z0-9_]+)}")
+
+
+def _slugify_text(value: str, fallback: str = "influencer") -> str:
+    normalized = _SLUG_RE.sub("-", str(value or "").strip().lower()).strip("-")
+    return normalized or fallback
+
+
+def _normalize_clone_channels(raw: Any) -> Dict[str, str]:
+    if not isinstance(raw, dict):
+        return {}
+    rows: Dict[str, str] = {}
+    for key, value in raw.items():
+        channel = str(key or "").strip().lower()
+        target = str(value or "").strip()
+        if not channel or not target:
+            continue
+        rows[channel] = target
+    return rows
+
+
+def _render_template_text(text: str, context: Dict[str, Any]) -> str:
+    def _replace(match: re.Match[str]) -> str:
+        key = str(match.group(1) or "").strip()
+        value = context.get(key)
+        if value is None:
+            return match.group(0)
+        return str(value)
+
+    return _TEMPLATE_TOKEN_RE.sub(_replace, str(text))
+
+
+def _render_template_payload(value: Any, context: Dict[str, Any]) -> Any:
+    if isinstance(value, str):
+        return _render_template_text(value, context)
+    if isinstance(value, list):
+        return [_render_template_payload(item, context) for item in value]
+    if isinstance(value, dict):
+        rendered: Dict[str, Any] = {}
+        for key, item in value.items():
+            rendered[str(key)] = _render_template_payload(item, context)
+        return rendered
+    return value
+
+
+def _resolve_followup_account_id(job_type: str, inputs: Dict[str, Any]) -> str:
+    if str(job_type or "").strip() != "sales.followup":
+        return ""
+    if not isinstance(inputs, dict):
+        return ""
+    return str(inputs.get("account_id") or "").strip()
+
+
+async def _can_enable_cloned_job(job_type: str, inputs: Dict[str, Any]) -> Dict[str, Any]:
+    account_id = _resolve_followup_account_id(job_type, inputs)
+    if not account_id:
+        return {"ok": True, "reason": ""}
+
+    account = await get_telegram_account(account_id, include_secret=False)
+    if not account:
+        return {"ok": False, "reason": f"connector_account_not_found:{account_id}"}
+
+    if not bool(account.get("enabled", False)):
+        return {"ok": False, "reason": f"connector_account_disabled:{account_id}"}
+
+    if not bool(account.get("has_bot_token", False)):
+        return {"ok": False, "reason": f"connector_bot_token_missing:{account_id}"}
+
+    return {"ok": True, "reason": ""}
 
 
 async def _is_redis_ready() -> bool:
@@ -389,6 +529,10 @@ class TelegramConnectorAccountUpsert(BaseModel):
     timezone: str = "Asia/Jakarta"
     default_channel: str = "telegram"
     default_account_id: str = "default"
+    default_branch_id: str = "br_01"
+    capture_inbound_text: bool = False
+    inbound_auto_followup: bool = True
+    inbound_followup_template: str = ""
 
 
 class TelegramConnectorAccountView(BaseModel):
@@ -404,8 +548,192 @@ class TelegramConnectorAccountView(BaseModel):
     timezone: str = "Asia/Jakarta"
     default_channel: str = "telegram"
     default_account_id: str = "default"
+    default_branch_id: str = "br_01"
+    capture_inbound_text: bool = False
+    inbound_auto_followup: bool = True
+    inbound_followup_template: str = ""
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
+
+
+class ProspectCreateRequest(BaseModel):
+    branch_id: str
+    name: str
+    channel: str
+    contact_id: str
+    source: str = ""
+    offer: str = ""
+    owner: str = ""
+    value_estimate: float = 0
+    stage: str = "new"
+    notes: str = ""
+    tags: List[str] = Field(default_factory=list)
+    next_followup_at: Optional[str] = None
+
+
+class ProspectUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    channel: Optional[str] = None
+    contact_id: Optional[str] = None
+    source: Optional[str] = None
+    offer: Optional[str] = None
+    owner: Optional[str] = None
+    value_estimate: Optional[float] = None
+    stage: Optional[str] = None
+    notes: Optional[str] = None
+    tags: Optional[List[str]] = None
+    next_followup_at: Optional[str] = None
+
+
+class ProspectCloseWonRequest(BaseModel):
+    amount: float = Field(gt=0)
+    leads_delta: int = Field(default=0, ge=0, le=100000)
+    closings_delta: int = Field(default=1, ge=1, le=100000)
+    note: str = ""
+
+
+class ProspectCloseLostRequest(BaseModel):
+    reason: str = ""
+
+
+class SalesFollowupDispatchRequest(BaseModel):
+    prospect_id: Optional[str] = None
+    branch_id: str = ""
+    account_id: str = ""
+    template: str = ""
+    max_items: int = Field(default=10, ge=1, le=100)
+    next_followup_minutes: int = Field(default=1440, ge=10, le=20160)
+
+
+class SalesFollowupAutomationRequest(BaseModel):
+    branch_id: str
+    account_id: str = ""
+    template: str = ""
+    max_items: int = Field(default=10, ge=1, le=100)
+    next_followup_minutes: int = Field(default=1440, ge=10, le=20160)
+    interval_sec: int = Field(default=600, ge=30, le=86400)
+
+
+class SalesInboundRequest(BaseModel):
+    branch_id: str
+    channel: str
+    contact_id: str
+    name: str = ""
+    source: str = ""
+    offer: str = ""
+    owner: str = ""
+    message: str = ""
+    value_estimate: float = Field(default=0, ge=0)
+    tags: List[str] = Field(default_factory=list)
+    stage: str = "new"
+    auto_followup: bool = True
+    account_id: str = ""
+    followup_template: str = ""
+    next_followup_minutes: int = Field(default=720, ge=10, le=20160)
+
+
+class SalesInboundResponse(BaseModel):
+    status: str
+    action: str
+    prospect_id: str
+    branch_id: str
+    channel: str
+    contact_id: str
+    followup_queued: bool = False
+    run_id: Optional[str] = None
+
+
+class InfluencerTemplateUpsertRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    mode: str = "product"
+    description: str = ""
+    enabled: bool = True
+    default_branch_id: str = "br_01"
+    branch_blueprint_id: str = "bp_agency_digital"
+    channels_required: List[str] = Field(default_factory=list)
+    job_templates: List[Dict[str, Any]] = Field(default_factory=list)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class InfluencerTemplateView(BaseModel):
+    template_id: str
+    name: str
+    mode: str = "product"
+    description: str = ""
+    enabled: bool = True
+    default_branch_id: str = ""
+    branch_blueprint_id: str = ""
+    channels_required: List[str] = Field(default_factory=list)
+    job_templates: List[Dict[str, Any]] = Field(default_factory=list)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class InfluencerProfileView(BaseModel):
+    influencer_id: str
+    name: str
+    niche: str = ""
+    mode: str = "product"
+    status: str = "active"
+    template_id: str = ""
+    branch_id: str = ""
+    channels: Dict[str, str] = Field(default_factory=dict)
+    offer_name: str = ""
+    offer_price: float = 0
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class InfluencerCloneJobView(BaseModel):
+    job_id: str
+    type: str
+    enabled: bool
+    status: str
+
+
+class InfluencerTemplateCloneRequest(BaseModel):
+    influencer_id: str = ""
+    name: str = Field(min_length=1, max_length=140)
+    niche: str = ""
+    mode: str = ""
+    branch_id: str = ""
+    channels: Dict[str, str] = Field(default_factory=dict)
+    offer_name: str = ""
+    offer_price: float = Field(default=0, ge=0)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    enable_jobs: bool = True
+    overwrite_existing_jobs: bool = True
+
+
+class InfluencerTemplateCloneResponse(BaseModel):
+    template_id: str
+    influencer: InfluencerProfileView
+    jobs: List[InfluencerCloneJobView] = Field(default_factory=list)
+    status: str = "ok"
+
+
+class InfluencerProfileUpdateRequest(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=140)
+    niche: Optional[str] = None
+    mode: Optional[str] = None
+    status: Optional[str] = None
+    template_id: Optional[str] = None
+    branch_id: Optional[str] = None
+    channels: Optional[Dict[str, str]] = None
+    offer_name: Optional[str] = None
+    offer_price: Optional[float] = Field(default=None, ge=0)
+    metadata: Optional[Dict[str, Any]] = None
+    apply_template_jobs: bool = False
+    enable_jobs: bool = True
+    overwrite_existing_jobs: bool = True
+
+
+class InfluencerProfileUpdateResponse(BaseModel):
+    influencer: InfluencerProfileView
+    jobs: List[InfluencerCloneJobView] = Field(default_factory=list)
+    status: str = "ok"
 
 
 class McpServerUpsertRequest(BaseModel):
@@ -816,6 +1144,9 @@ async def on_startup():
 
     if redis_ready:
         await init_queue()
+
+    with suppress(Exception):
+        await ensure_default_influencer_templates()
 
     await append_event("system.api_started", {"message": "API service started", "redis_ready": redis_ready})
     if not redis_ready:
@@ -2236,6 +2567,681 @@ async def events(
     except RedisError:
         return _fallback_payload("/events", [])
 
+
+# Sales Closing Engine Endpoints
+@app.post("/sales/prospects")
+async def api_create_prospect(request: ProspectCreateRequest):
+    from app.core.branches import get_branch
+
+    branch_id = str(request.branch_id or "").strip().lower()
+    branch = await get_branch(branch_id)
+    if not branch:
+        raise HTTPException(status_code=404, detail="Branch not found")
+
+    try:
+        row = await create_prospect(
+            {
+                "branch_id": branch_id,
+                "name": request.name,
+                "channel": request.channel,
+                "contact_id": request.contact_id,
+                "source": request.source,
+                "offer": request.offer,
+                "owner": request.owner,
+                "value_estimate": request.value_estimate,
+                "stage": request.stage,
+                "notes": request.notes,
+                "tags": request.tags,
+                "next_followup_at": request.next_followup_at,
+            }
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    await append_event(
+        "sales.prospect_created",
+        {
+            "prospect_id": row.get("prospect_id"),
+            "branch_id": row.get("branch_id"),
+            "channel": row.get("channel"),
+            "source": row.get("source"),
+        },
+    )
+    return row
+
+
+@app.post("/sales/inbound", response_model=SalesInboundResponse)
+async def api_sales_inbound(request: SalesInboundRequest):
+    from app.core.branches import get_branch
+
+    branch_id = str(request.branch_id or "").strip().lower()
+    if not branch_id:
+        raise HTTPException(status_code=400, detail="branch_id is required")
+    branch = await get_branch(branch_id)
+    if not branch:
+        raise HTTPException(status_code=404, detail="Branch not found")
+
+    channel = normalize_prospect_channel(request.channel)
+    contact_id = str(request.contact_id or "").strip()
+    if not channel:
+        raise HTTPException(status_code=400, detail="channel is required")
+    if not contact_id:
+        raise HTTPException(status_code=400, detail="contact_id is required")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    inbound_message = str(request.message or "").strip()
+    inbound_note = ""
+    if inbound_message:
+        inbound_note = f"[inbound:{channel}] {now_iso} {inbound_message}"
+
+    normalized_tags = [str(tag or "").strip().lower() for tag in (request.tags or [])]
+    normalized_tags = [tag for tag in normalized_tags if tag]
+    if "inbound" not in normalized_tags:
+        normalized_tags.append("inbound")
+    if channel not in normalized_tags:
+        normalized_tags.append(channel)
+
+    existing = await find_open_prospect_by_contact(
+        branch_id=branch_id,
+        channel=channel,
+        contact_id=contact_id,
+    )
+
+    action = "created"
+    if existing:
+        existing_notes = str(existing.get("notes") or "").strip()
+        merged_notes = existing_notes
+        if inbound_note:
+            merged_notes = f"{existing_notes}\n{inbound_note}".strip() if existing_notes else inbound_note
+
+        existing_tags = [str(tag or "").strip().lower() for tag in (existing.get("tags") or [])]
+        merged_tags: List[str] = []
+        seen_tags = set()
+        for tag in existing_tags + normalized_tags:
+            if not tag or tag in seen_tags:
+                continue
+            seen_tags.add(tag)
+            merged_tags.append(tag)
+
+        update_payload: Dict[str, Any] = {
+            "name": str(request.name or existing.get("name") or "").strip() or str(existing.get("name") or ""),
+            "source": str(request.source or existing.get("source") or "").strip(),
+            "offer": str(request.offer or existing.get("offer") or "").strip(),
+            "owner": str(request.owner or existing.get("owner") or "").strip(),
+            "notes": merged_notes,
+            "tags": merged_tags,
+        }
+        if request.value_estimate > 0:
+            update_payload["value_estimate"] = float(request.value_estimate)
+        prospect = await update_prospect(str(existing.get("prospect_id") or "").strip(), update_payload)
+        if not prospect:
+            raise HTTPException(status_code=500, detail="Failed to update inbound prospect")
+        action = "updated"
+    else:
+        try:
+            prospect = await create_prospect(
+                {
+                    "branch_id": branch_id,
+                    "name": str(request.name or contact_id).strip(),
+                    "channel": channel,
+                    "contact_id": contact_id,
+                    "source": str(request.source or f"inbound.{channel}").strip(),
+                    "offer": str(request.offer or "").strip(),
+                    "owner": str(request.owner or "").strip(),
+                    "value_estimate": float(request.value_estimate or 0),
+                    "stage": str(request.stage or "new").strip() or "new",
+                    "notes": inbound_note,
+                    "tags": normalized_tags,
+                    "next_followup_at": (
+                        datetime.now(timezone.utc) + timedelta(minutes=int(request.next_followup_minutes))
+                    ).isoformat(),
+                }
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
+    prospect_id = str(prospect.get("prospect_id") or "").strip()
+    followup_queued = False
+    queued_run_id: Optional[str] = None
+    if bool(request.auto_followup):
+        payload_inputs = {
+            "prospect_id": prospect_id,
+            "branch_id": branch_id,
+            "account_id": str(request.account_id or "").strip(),
+            "template": str(request.followup_template or "").strip(),
+            "max_items": 1,
+            "next_followup_minutes": int(request.next_followup_minutes),
+        }
+        payload_inputs = {k: v for k, v in payload_inputs.items() if v not in {"", None}}
+        queued = await _queue_custom_job_run(
+            job_id=f"sales-followup-dispatch-{branch_id}",
+            job_type="sales.followup",
+            inputs=payload_inputs,
+            timeout_ms=45000,
+            source="api.sales_inbound",
+        )
+        followup_queued = True
+        queued_run_id = str(queued.get("run_id") or "").strip() or None
+
+    await append_event(
+        "sales.inbound_received",
+        {
+            "prospect_id": prospect_id,
+            "branch_id": branch_id,
+            "channel": channel,
+            "contact_id": contact_id,
+            "action": action,
+            "followup_queued": followup_queued,
+            "run_id": queued_run_id,
+        },
+    )
+
+    return SalesInboundResponse(
+        status="ok",
+        action=action,
+        prospect_id=prospect_id,
+        branch_id=branch_id,
+        channel=channel,
+        contact_id=contact_id,
+        followup_queued=followup_queued,
+        run_id=queued_run_id,
+    )
+
+
+@app.get("/sales/prospects")
+async def api_list_prospects(
+    branch_id: str = "",
+    stage: str = "",
+    due_only: bool = False,
+    limit: int = Query(default=200, ge=1, le=1000),
+):
+    rows = await list_prospects(
+        branch_id=str(branch_id or "").strip().lower(),
+        stage=str(stage or "").strip().lower(),
+        due_only=bool(due_only),
+        limit=limit,
+    )
+    return rows
+
+
+@app.get("/sales/prospects/{prospect_id}")
+async def api_get_prospect(prospect_id: str):
+    row = await get_prospect(str(prospect_id or "").strip())
+    if not row:
+        raise HTTPException(status_code=404, detail="Prospect not found")
+    return row
+
+
+@app.patch("/sales/prospects/{prospect_id}")
+async def api_update_prospect(prospect_id: str, request: ProspectUpdateRequest):
+    payload = request.model_dump(mode="json", exclude_unset=True)
+    row = await update_prospect(str(prospect_id or "").strip(), payload)
+    if not row:
+        raise HTTPException(status_code=404, detail="Prospect not found")
+
+    await append_event(
+        "sales.prospect_updated",
+        {
+            "prospect_id": row.get("prospect_id"),
+            "branch_id": row.get("branch_id"),
+            "stage": row.get("stage"),
+        },
+    )
+    return row
+
+
+@app.post("/sales/prospects/{prospect_id}/close-won")
+async def api_close_prospect_won(prospect_id: str, request: ProspectCloseWonRequest):
+    from app.core.branches import update_branch_metrics
+
+    pid = str(prospect_id or "").strip()
+    if not await get_prospect(pid):
+        raise HTTPException(status_code=404, detail="Prospect not found")
+
+    row = await mark_prospect_won(prospect_id=pid, amount=request.amount, note=request.note)
+    if not row:
+        raise HTTPException(status_code=404, detail="Prospect not found")
+
+    await update_branch_metrics(
+        str(row.get("branch_id") or "").strip().lower(),
+        {
+            "revenue": float(request.amount),
+            "closings": int(request.closings_delta),
+            "leads": int(request.leads_delta),
+        },
+    )
+    await append_event(
+        "sales.prospect_closed_won",
+        {
+            "prospect_id": pid,
+            "branch_id": row.get("branch_id"),
+            "revenue": float(request.amount),
+            "closings_delta": int(request.closings_delta),
+            "leads_delta": int(request.leads_delta),
+        },
+    )
+    return row
+
+
+@app.post("/sales/prospects/{prospect_id}/close-lost")
+async def api_close_prospect_lost(prospect_id: str, request: ProspectCloseLostRequest):
+    pid = str(prospect_id or "").strip()
+    row = await mark_prospect_lost(prospect_id=pid, reason=request.reason)
+    if not row:
+        raise HTTPException(status_code=404, detail="Prospect not found")
+
+    await append_event(
+        "sales.prospect_closed_lost",
+        {
+            "prospect_id": pid,
+            "branch_id": row.get("branch_id"),
+            "reason": request.reason,
+        },
+    )
+    return row
+
+
+@app.post("/sales/followup/run")
+async def api_dispatch_followup_run(request: SalesFollowupDispatchRequest):
+    branch_id = str(request.branch_id or "").strip().lower()
+    pid = str(request.prospect_id or "").strip()
+    if not pid and not branch_id:
+        raise HTTPException(status_code=400, detail="branch_id or prospect_id is required")
+
+    if pid:
+        prospect = await get_prospect(pid)
+        if not prospect:
+            raise HTTPException(status_code=404, detail="Prospect not found")
+        if not branch_id:
+            branch_id = str(prospect.get("branch_id") or "").strip().lower()
+
+    payload_inputs = {
+        "prospect_id": pid or None,
+        "branch_id": branch_id,
+        "account_id": str(request.account_id or "").strip(),
+        "template": str(request.template or "").strip(),
+        "max_items": int(request.max_items),
+        "next_followup_minutes": int(request.next_followup_minutes),
+    }
+    payload_inputs = {k: v for k, v in payload_inputs.items() if v not in {"", None}}
+
+    job_id = f"sales-followup-dispatch-{branch_id or 'manual'}"
+    queued = await _queue_custom_job_run(
+        job_id=job_id,
+        job_type="sales.followup",
+        inputs=payload_inputs,
+        timeout_ms=45000,
+        source="api.sales_followup_dispatch",
+    )
+    return queued
+
+
+@app.post("/sales/followup/automation")
+async def api_upsert_followup_automation(request: SalesFollowupAutomationRequest):
+    from app.core.branches import get_branch
+
+    branch_id = str(request.branch_id or "").strip().lower()
+    branch = await get_branch(branch_id)
+    if not branch:
+        raise HTTPException(status_code=404, detail="Branch not found")
+
+    job_id = f"sales-followup-{branch_id}"
+    spec = JobSpec(
+        job_id=job_id,
+        type="sales.followup",
+        schedule=Schedule(interval_sec=int(request.interval_sec)),
+        timeout_ms=45000,
+        retry_policy=RetryPolicy(max_retry=3, backoff_sec=[5, 15, 30]),
+        inputs={
+            "branch_id": branch_id,
+            "account_id": str(request.account_id or "").strip(),
+            "template": str(request.template or "").strip(),
+            "max_items": int(request.max_items),
+            "next_followup_minutes": int(request.next_followup_minutes),
+            "source": "sales.followup.automation",
+        },
+    )
+    await save_job_spec(job_id, _serialisasi_model(spec))
+    await enable_job(job_id)
+
+    await append_event(
+        "sales.followup_automation_upserted",
+        {
+            "job_id": job_id,
+            "branch_id": branch_id,
+            "interval_sec": int(request.interval_sec),
+        },
+    )
+    return {"job_id": job_id, "status": "enabled", "branch_id": branch_id}
+
+
+@app.get("/influencer/templates", response_model=List[InfluencerTemplateView])
+async def api_list_influencer_template(limit: int = Query(default=200, ge=1, le=1000)):
+    return await list_influencer_templates(limit=limit)
+
+
+@app.get("/influencer/templates/{template_id}", response_model=InfluencerTemplateView)
+async def api_get_influencer_template_by_id(template_id: str):
+    row = await get_influencer_template(str(template_id or "").strip().lower())
+    if not row:
+        raise HTTPException(status_code=404, detail="Influencer template not found")
+    return row
+
+
+@app.put("/influencer/templates/{template_id}", response_model=InfluencerTemplateView)
+async def api_upsert_influencer_template_by_id(template_id: str, request: InfluencerTemplateUpsertRequest):
+    clean_template_id = str(template_id or "").strip().lower()
+    if not clean_template_id:
+        raise HTTPException(status_code=400, detail="template_id is required")
+
+    row = await upsert_influencer_template(clean_template_id, request.model_dump(mode="json"))
+    await append_event(
+        "influencer.template_upserted",
+        {
+            "template_id": clean_template_id,
+            "mode": row.get("mode"),
+            "enabled": bool(row.get("enabled", True)),
+        },
+    )
+    return row
+
+
+@app.get("/influencer/profiles", response_model=List[InfluencerProfileView])
+async def api_list_influencer_profiles(limit: int = Query(default=200, ge=1, le=1000)):
+    return await list_influencers(limit=limit)
+
+
+@app.get("/influencer/profiles/{influencer_id}", response_model=InfluencerProfileView)
+async def api_get_influencer_profile(influencer_id: str):
+    row = await get_influencer(str(influencer_id or "").strip().lower())
+    if not row:
+        raise HTTPException(status_code=404, detail="Influencer profile not found")
+    return row
+
+
+def _normalize_influencer_mode(value: Any, fallback: str = "product") -> str:
+    mode = str(value or fallback).strip().lower()
+    if mode not in {"endorse", "product", "hybrid"}:
+        return str(fallback or "product").strip().lower() or "product"
+    return mode
+
+
+def _build_influencer_render_context(template_id: str, profile: Dict[str, Any]) -> Dict[str, Any]:
+    offer_price = float(profile.get("offer_price") or 0)
+    return {
+        "template_id": str(template_id or "").strip().lower(),
+        "influencer_id": str(profile.get("influencer_id") or "").strip().lower(),
+        "influencer_name": str(profile.get("name") or "").strip(),
+        "niche": str(profile.get("niche") or "").strip(),
+        "mode": _normalize_influencer_mode(profile.get("mode"), fallback="product"),
+        "branch_id": str(profile.get("branch_id") or "").strip().lower(),
+        "offer_name": str(profile.get("offer_name") or "").strip() or "offer",
+        "offer_price": int(offer_price) if offer_price.is_integer() else offer_price,
+    }
+
+
+async def _apply_template_jobs_for_influencer(
+    *,
+    template_id: str,
+    template: Dict[str, Any],
+    profile: Dict[str, Any],
+    enable_jobs: bool,
+    overwrite_existing_jobs: bool,
+    source: str,
+) -> List[InfluencerCloneJobView]:
+    from app.core.branches import get_branch
+
+    clean_template_id = str(template_id or "").strip().lower()
+    influencer_id = str(profile.get("influencer_id") or "").strip().lower()
+    branch_id = str(profile.get("branch_id") or "").strip().lower()
+    if not influencer_id:
+        raise HTTPException(status_code=400, detail="Influencer profile missing influencer_id")
+    if not branch_id:
+        raise HTTPException(status_code=400, detail="Influencer profile missing branch_id")
+
+    branch = await get_branch(branch_id)
+    if not branch:
+        raise HTTPException(status_code=404, detail=f"Branch '{branch_id}' not found")
+
+    render_context = _build_influencer_render_context(clean_template_id, profile)
+    jobs_payload: List[InfluencerCloneJobView] = []
+    raw_job_templates = template.get("job_templates", [])
+    if not isinstance(raw_job_templates, list):
+        raw_job_templates = []
+
+    for index, row in enumerate(raw_job_templates, start=1):
+        if not isinstance(row, dict):
+            continue
+
+        job_id_pattern = str(row.get("job_id_pattern") or f"inf-{influencer_id}-job-{index}").strip()
+        job_id = _slugify_text(
+            _render_template_text(job_id_pattern, render_context),
+            fallback=f"inf-{influencer_id}-job-{index}",
+        )
+        job_type = str(row.get("type") or "agent.workflow").strip()
+
+        schedule_payload = row.get("schedule", {})
+        schedule_cron = ""
+        schedule_interval = None
+        if isinstance(schedule_payload, dict):
+            schedule_cron = str(schedule_payload.get("cron") or "").strip()
+            interval_value = schedule_payload.get("interval_sec")
+            if isinstance(interval_value, int):
+                schedule_interval = max(10, interval_value)
+        if not schedule_cron and schedule_interval is None:
+            schedule_interval = 1800
+
+        retry_payload = row.get("retry_policy", {})
+        max_retry = 2
+        backoff_sec = [5, 15, 30]
+        if isinstance(retry_payload, dict):
+            raw_retry = retry_payload.get("max_retry")
+            raw_backoff = retry_payload.get("backoff_sec")
+            if isinstance(raw_retry, int):
+                max_retry = max(0, min(10, raw_retry))
+            if isinstance(raw_backoff, list):
+                candidate = [int(item) for item in raw_backoff if isinstance(item, (int, float))]
+                if candidate:
+                    backoff_sec = candidate[:10]
+
+        inputs_raw = row.get("inputs", {})
+        inputs_rendered = _render_template_payload(inputs_raw, render_context) if isinstance(inputs_raw, dict) else {}
+
+        job_spec = JobSpec(
+            job_id=job_id,
+            type=job_type,
+            schedule=Schedule(
+                cron=schedule_cron or None,
+                interval_sec=schedule_interval,
+            ),
+            timeout_ms=max(5000, int(row.get("timeout_ms") or 45000)),
+            retry_policy=RetryPolicy(max_retry=max_retry, backoff_sec=backoff_sec),
+            inputs=inputs_rendered,
+        )
+
+        existing_job = await get_job_spec(job_id)
+        if existing_job and not bool(overwrite_existing_jobs):
+            is_enabled = await is_job_enabled(job_id)
+            jobs_payload.append(
+                InfluencerCloneJobView(
+                    job_id=job_id,
+                    type=job_type,
+                    enabled=bool(is_enabled),
+                    status="skipped_existing",
+                )
+            )
+            continue
+
+        job_status = "updated" if existing_job else "created"
+        await save_job_spec(
+            job_id,
+            _serialisasi_model(job_spec),
+            source=source,
+            note=f"template_sync:{clean_template_id}:{influencer_id}",
+        )
+
+        requested_enable = bool(enable_jobs and bool(row.get("enabled", True)))
+        should_enable = requested_enable
+        block_reason = ""
+        if requested_enable:
+            readiness = await _can_enable_cloned_job(job_type, inputs_rendered)
+            should_enable = bool(readiness.get("ok"))
+            block_reason = str(readiness.get("reason") or "").strip()
+
+        if should_enable:
+            await enable_job(job_id)
+        else:
+            await disable_job(job_id)
+
+        status_label = job_status
+        if requested_enable and not should_enable and block_reason:
+            status_label = f"{job_status}:blocked:{block_reason}"
+
+        jobs_payload.append(
+            InfluencerCloneJobView(
+                job_id=job_id,
+                type=job_type,
+                enabled=should_enable,
+                status=status_label,
+            )
+        )
+
+    return jobs_payload
+
+
+@app.patch("/influencer/profiles/{influencer_id}", response_model=InfluencerProfileUpdateResponse)
+async def api_patch_influencer_profile(influencer_id: str, request: InfluencerProfileUpdateRequest):
+    clean_id = str(influencer_id or "").strip().lower()
+    if not clean_id:
+        raise HTTPException(status_code=400, detail="influencer_id is required")
+
+    existing = await get_influencer(clean_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Influencer profile not found")
+
+    payload = request.model_dump(mode="json", exclude_unset=True)
+    apply_template_jobs = bool(payload.pop("apply_template_jobs", False))
+    enable_jobs = bool(payload.pop("enable_jobs", True))
+    overwrite_existing_jobs = bool(payload.pop("overwrite_existing_jobs", True))
+
+    if "mode" in payload:
+        payload["mode"] = _normalize_influencer_mode(payload.get("mode"), fallback=str(existing.get("mode") or "product"))
+    if "template_id" in payload:
+        payload["template_id"] = str(payload.get("template_id") or "").strip().lower()
+    if "branch_id" in payload:
+        payload["branch_id"] = str(payload.get("branch_id") or "").strip().lower()
+    if "status" in payload:
+        status = str(payload.get("status") or "").strip().lower()
+        payload["status"] = status or str(existing.get("status") or "active").strip().lower() or "active"
+
+    updated_profile = await upsert_influencer(clean_id, payload)
+    jobs_payload: List[InfluencerCloneJobView] = []
+    if apply_template_jobs:
+        clean_template_id = str(updated_profile.get("template_id") or "").strip().lower()
+        if not clean_template_id:
+            raise HTTPException(status_code=400, detail="template_id is required to apply template jobs")
+        template = await get_influencer_template(clean_template_id)
+        if not template:
+            raise HTTPException(status_code=404, detail="Influencer template not found")
+
+        jobs_payload = await _apply_template_jobs_for_influencer(
+            template_id=clean_template_id,
+            template=template,
+            profile=updated_profile,
+            enable_jobs=enable_jobs,
+            overwrite_existing_jobs=overwrite_existing_jobs,
+            source="api.influencer.profile_update",
+        )
+
+    await append_event(
+        "influencer.profile_updated",
+        {
+            "influencer_id": clean_id,
+            "template_id": updated_profile.get("template_id"),
+            "branch_id": updated_profile.get("branch_id"),
+            "apply_template_jobs": apply_template_jobs,
+            "job_count": len(jobs_payload),
+        },
+    )
+
+    return InfluencerProfileUpdateResponse(
+        influencer=InfluencerProfileView(**updated_profile),
+        jobs=jobs_payload,
+        status="ok",
+    )
+
+
+@app.post("/influencer/templates/{template_id}/clone", response_model=InfluencerTemplateCloneResponse)
+async def api_clone_influencer_template(template_id: str, request: InfluencerTemplateCloneRequest):
+    from app.core.branches import get_branch
+
+    clean_template_id = str(template_id or "").strip().lower()
+    template = await get_influencer_template(clean_template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Influencer template not found")
+
+    requested_id = str(request.influencer_id or "").strip().lower()
+    generated_from_name = _slugify_text(request.name, fallback="influencer")
+    influencer_id = _slugify_text(requested_id or generated_from_name, fallback="influencer")
+    mode = str(request.mode or template.get("mode") or "product").strip().lower()
+    if mode not in {"endorse", "product", "hybrid"}:
+        mode = "product"
+
+    branch_id = (
+        str(request.branch_id or "").strip().lower()
+        or str(template.get("default_branch_id") or "").strip().lower()
+        or "br_01"
+    )
+    branch = await get_branch(branch_id)
+    if not branch:
+        raise HTTPException(status_code=404, detail=f"Branch '{branch_id}' not found")
+
+    normalized_channels = _normalize_clone_channels(request.channels)
+    offer_name = str(request.offer_name or "").strip()
+    offer_price = float(request.offer_price or 0)
+
+    influencer_profile = await upsert_influencer(
+        influencer_id,
+        {
+            "name": request.name,
+            "niche": request.niche,
+            "mode": mode,
+            "template_id": clean_template_id,
+            "branch_id": branch_id,
+            "channels": normalized_channels,
+            "offer_name": offer_name,
+            "offer_price": offer_price,
+            "metadata": request.metadata,
+        },
+    )
+
+    jobs_payload = await _apply_template_jobs_for_influencer(
+        template_id=clean_template_id,
+        template=template,
+        profile=influencer_profile,
+        enable_jobs=bool(request.enable_jobs),
+        overwrite_existing_jobs=bool(request.overwrite_existing_jobs),
+        source="api.influencer.clone",
+    )
+
+    await append_event(
+        "influencer.template_cloned",
+        {
+            "template_id": clean_template_id,
+            "influencer_id": influencer_id,
+            "branch_id": branch_id,
+            "job_count": len(jobs_payload),
+        },
+    )
+
+    return InfluencerTemplateCloneResponse(
+        template_id=clean_template_id,
+        influencer=InfluencerProfileView(**influencer_profile),
+        jobs=jobs_payload,
+        status="ok",
+    )
+
+
 # Branch Endpoints (Phase 15 - Holding Suite)
 @app.get("/branches")
 async def api_list_branches():
@@ -2299,6 +3305,11 @@ class ChatMessageRequest(BaseModel):
 async def api_get_chat_history(limit: int = 30):
     from app.core.boardroom import get_chat_history
     return await get_chat_history(limit=limit)
+
+@app.post("/boardroom/chat")
+async def api_chat_with_ceo(request: ChatMessageRequest):
+    from app.core.boardroom import process_chairman_mandate
+    return await process_chairman_mandate(request.text)
 
 @app.get("/system/infrastructure")
 async def api_system_infrastructure():

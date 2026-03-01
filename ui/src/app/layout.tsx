@@ -1,19 +1,25 @@
 import './globals.css';
-import { DM_Sans, Montserrat } from 'next/font/google';
+import { Caveat, Plus_Jakarta_Sans, Sora } from 'next/font/google';
 import SidebarNav from '@/components/sidebar-nav';
 
 import Providers from './providers';
 
-const bodyFont = DM_Sans({
+const bodyFont = Plus_Jakarta_Sans({
   subsets: ['latin'],
   variable: '--font-body',
-  weight: ['400', '500', '700'],
+  weight: ['400', '500', '600', '700'],
 });
 
-const headingFont = Montserrat({
+const headingFont = Sora({
   subsets: ['latin'],
   variable: '--font-heading',
-  weight: ['500', '600', '700', '800'],
+  weight: ['500', '600', '700'],
+});
+
+const signatureFont = Caveat({
+  subsets: ['latin'],
+  variable: '--font-signature',
+  weight: ['600', '700'],
 });
 
 export default function RootLayout({
@@ -23,7 +29,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="id">
-      <body className={`${bodyFont.variable} ${headingFont.variable} h-screen w-screen overflow-hidden antialiased`}>
+      <body className={`${bodyFont.variable} ${headingFont.variable} ${signatureFont.variable} h-screen w-screen overflow-hidden antialiased`}>
         <Providers>
           <div className="relative h-screen w-screen overflow-hidden bg-gradient-to-br from-[#EAF4FF] via-[#F0F7FF] to-[#E2EFFF] p-3 lg:p-4">
             <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -54,7 +60,7 @@ export default function RootLayout({
                   <p className="mt-1 text-xs text-blue-900/60 font-body-copy">Kontrol.</p>
                   <SidebarNav compact />
                 </div>
-                <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
+                <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
               </main>
             </div>
           </div>

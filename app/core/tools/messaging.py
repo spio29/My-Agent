@@ -1,7 +1,8 @@
-from typing import Dict, Any, Optional
-import json
+from typing import Any, Dict
+
+import aiohttp
+
 from .base import Tool
-from app.core.redis_client import redis_client
 
 class MessagingTool(Tool):
     @property
@@ -12,15 +13,103 @@ class MessagingTool(Tool):
     def version(self) -> str:
         return "1.0.0"
 
+    async def _send_telegram_message(
+        self,
+        *,
+        bot_token: str,
+        chat_id: str,
+        text: str,
+    ) -> Dict[str, Any]:
+        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+        payload = {
+            "chat_id": str(chat_id).strip(),
+            "text": str(text or "")[:3800],
+        }
+        timeout = aiohttp.ClientTimeout(total=20)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(url, json=payload) as response:
+                data = await response.json(content_type=None)
+                if response.status >= 400:
+                    return {
+                        "success": False,
+                        "error": f"Telegram API HTTP {response.status}",
+                        "detail": data,
+                    }
+                if not isinstance(data, dict) or not data.get("ok"):
+                    return {
+                        "success": False,
+                        "error": "Telegram API returned non-ok payload",
+                        "detail": data,
+                    }
+                result = data.get("result") or {}
+                return {
+                    "success": True,
+                    "provider": "telegram_bot_api",
+                    "message_id": result.get("message_id"),
+                }
+
     async def run(self, input_data: Dict[str, Any], ctx) -> Dict[str, Any]:
-        channel = input_data.get("channel")
-        text = input_data.get("text")
-        to_id = input_data.get("to_id")
-        account_id = input_data.get("account_id")
-        branch_id = getattr(ctx, "branch_id", "default")
+        channel = str(input_data.get("channel") or "").strip().lower()
+        text = str(input_data.get("text") or "")
+        to_id = str(input_data.get("to_id") or "").strip()
+        account_id = str(input_data.get("account_id") or "").strip()
+        branch_id = str(getattr(ctx, "branch_id", "default") or "default")
 
         if not channel or not text or not to_id:
             return {"success": False, "error": "channel, text, and to_id are required"}
+
+        if channel == "telegram":
+            from app.core.connector_accounts import get_telegram_account
+            from app.core.queue import append_event
+
+            telegram_account_id = account_id or str(input_data.get("default_account_id") or "bot_a01").strip()
+            account = await get_telegram_account(telegram_account_id, include_secret=True)
+            if not account:
+                return {
+                    "success": False,
+                    "error": f"Telegram account '{telegram_account_id}' not found",
+                }
+
+            bot_token = str(account.get("bot_token") or "").strip()
+            if not bot_token:
+                return {
+                    "success": False,
+                    "error": f"Telegram account '{telegram_account_id}' has no bot_token",
+                }
+
+            allowed = [str(v).strip() for v in (account.get("allowed_chat_ids") or []) if str(v).strip()]
+            if allowed and to_id not in set(allowed):
+                return {
+                    "success": False,
+                    "error": f"chat_id {to_id} is not allowed for account {telegram_account_id}",
+                }
+
+            result = await self._send_telegram_message(
+                bot_token=bot_token,
+                chat_id=to_id,
+                text=text,
+            )
+            if not result.get("success"):
+                return result
+
+            await append_event(
+                "messaging.message_sent",
+                {
+                    "account_id": telegram_account_id,
+                    "platform": "telegram",
+                    "to": to_id,
+                    "mode": "telegram_bot_api",
+                },
+            )
+            return {
+                "success": True,
+                "used_account": telegram_account_id,
+                "message": "Message delivered via telegram bot API.",
+                "metadata": {
+                    "provider": "telegram_bot_api",
+                    "message_id": result.get("message_id"),
+                },
+            }
 
         from app.core.armory import list_all_accounts, lock_account, unlock_account, get_account
 
@@ -30,7 +119,11 @@ class MessagingTool(Tool):
             target_account = await get_account(account_id, include_password=True)
         else:
             available = await list_all_accounts(platform=channel)
-            ready_accounts = [a for b in available if b.get("branch_id") == branch_id and b.get("status") == "ready"]
+            ready_accounts = [
+                a
+                for a in available
+                if a.get("branch_id") == branch_id and str(a.get("status") or "").lower() == "ready"
+            ]
             if ready_accounts:
                 target_account = ready_accounts[0]
 
@@ -49,8 +142,8 @@ class MessagingTool(Tool):
             print(f"[STEALTH] Opening {channel} session for {target_account['username']} via Proxy: {proxy_str or 'DIRECT'}")
 
             # Simulate Human Interaction
-            import asyncio
             import random
+            import asyncio
 
             # A. Typing Simulation (Variable speed)
             typing_speed = random.uniform(0.05, 0.2)

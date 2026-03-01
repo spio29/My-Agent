@@ -121,6 +121,36 @@ def _ekstrak_objek_json(raw_text: str) -> Optional[Dict[str, Any]]:
     return payload if isinstance(payload, dict) else None
 
 
+def _rencana_fallback_lokal(raw_content: str) -> Dict[str, Any]:
+    preview = _ringkas_teks(raw_content, 220) if raw_content else ""
+    final_message = "Planner lokal tidak mengembalikan JSON valid. Workflow masuk mode aman."
+    if preview:
+        final_message = f"{final_message} Preview: {preview}"
+    return {
+        "summary": "Planner lokal fallback aktif.",
+        "final_message": final_message,
+        "steps": [],
+    }
+
+
+def _resolve_agent_workflow_max_iterations(inputs: Dict[str, Any], *, local_only_mode: bool) -> int:
+    default_value = 2 if local_only_mode else 5
+
+    raw = inputs.get("max_iterations")
+    if raw in {None, ""}:
+        if local_only_mode:
+            raw = os.getenv("AGENT_WORKFLOW_MAX_ITERATIONS_LOCAL")
+        if raw in {None, ""}:
+            raw = os.getenv("AGENT_WORKFLOW_MAX_ITERATIONS")
+
+    try:
+        value = int(raw)
+    except Exception:
+        value = default_value
+
+    return max(1, min(8, value))
+
+
 def _ke_peta_string(raw: Any) -> Dict[str, str]:
     if not isinstance(raw, dict):
         return {}
@@ -738,10 +768,9 @@ async def _rencanakan_aksi_dengan_openai(
         ],
     }
 
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
 
     timeout = aiohttp.ClientTimeout(total=60)
     async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -752,12 +781,12 @@ async def _rencanakan_aksi_dengan_openai(
 
     try:
         data = json.loads(response_text)
-    except Exception as exc:
-        raise RuntimeError(f"OpenAI planner response is not JSON: {exc}") from exc
+    except Exception:
+        return _rencana_fallback_lokal(response_text)
 
     choices = data.get("choices")
     if not isinstance(choices, list) or not choices:
-        raise RuntimeError("OpenAI planner response has no choices.")
+        return _rencana_fallback_lokal(str(data.get("response") or response_text))
 
     message = choices[0].get("message", {}) if isinstance(choices[0], dict) else {}
     content = message.get("content", "")
@@ -769,7 +798,7 @@ async def _rencanakan_aksi_dengan_openai(
 
     parsed = _ekstrak_objek_json(str(content))
     if not parsed:
-        raise RuntimeError("OpenAI planner did not return valid JSON plan.")
+        return _rencana_fallback_lokal(str(content or response_text))
     return parsed
 
 
@@ -1032,6 +1061,11 @@ async def run(ctx, inputs: Dict[str, Any]) -> Dict[str, Any]:
     prompt_awal = str(inputs.get("prompt") or "").strip()
     job_id_ctx = str(getattr(ctx, "job_id", "") or "").strip()
     run_id_ctx = str(getattr(ctx, "run_id", "") or "").strip()
+    branch_id_ctx = str(inputs.get("branch_id") or inputs.get("target_branch_id") or "").strip()
+    if not branch_id_ctx:
+        flow_group_ctx = str(inputs.get("flow_group") or "").strip()
+        if flow_group_ctx.lower().startswith("br_"):
+            branch_id_ctx = flow_group_ctx
 
     try:
         konteks_experiment = await resolve_experiment_prompt_for_job(
@@ -1186,9 +1220,29 @@ async def run(ctx, inputs: Dict[str, Any]) -> Dict[str, Any]:
                 id_model_openai = str(config.get("model_id") or "").strip()
 
     if not kunci_api_openai:
-        kunci_api_openai = str(os.getenv("OPENAI_API_KEY") or "").strip()
+        kunci_api_openai = str(os.getenv("OPENAI_API_KEY") or os.getenv("LOCAL_AI_API_KEY") or "").strip()
 
-    if not kunci_api_openai:
+    mode_ai = str(inputs.get("ai_mode") or os.getenv("AGENT_AI_MODE") or "").strip().lower()
+    local_only_mode = mode_ai in {"local", "local_only", "local-only"}
+    local_only_mode = local_only_mode or str(os.getenv("AGENT_LOCAL_ONLY") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    local_only_mode = local_only_mode or "11434" in OPENAI_CHAT_COMPLETIONS_URL
+
+    if local_only_mode:
+        model_lokal = str(
+            inputs.get("local_model_id")
+            or inputs.get("model_id")
+            or os.getenv("PLANNER_AI_MODEL")
+            or DEFAULT_OPENAI_MODEL
+        ).strip()
+        if model_lokal:
+            id_model_openai = model_lokal
+
+    if not kunci_api_openai and not local_only_mode:
         requests = [
             _buat_request_izin(
                 kind="provider_account",
@@ -1249,10 +1303,11 @@ async def run(ctx, inputs: Dict[str, Any]) -> Dict[str, Any]:
 
     hasil_langkah_akumulasi: List[Dict[str, Any]] = []
     rencana_terakhir: Dict[str, Any] = {}
-    iterasi_maks = 5
+    iterasi_maks = _resolve_agent_workflow_max_iterations(inputs, local_only_mode=local_only_mode)
     iterasi_sekarang = 0
     final_message_ditemukan = ""
     summary_akumulasi = []
+    rencana_signatures_terakhir: List[str] = []
 
     while iterasi_sekarang < iterasi_maks:
         iterasi_sekarang += 1
@@ -1282,6 +1337,28 @@ async def run(ctx, inputs: Dict[str, Any]) -> Dict[str, Any]:
                 
             if not rencana_terakhir.get("steps"):
                 break
+
+            signatures_saat_ini: List[str] = []
+            for step in rencana_terakhir.get("steps", []):
+                if not isinstance(step, dict):
+                    continue
+                signature = _signature_dari_step_rencana(step)
+                if not signature:
+                    kind = str(step.get("kind") or "").strip().lower() or "unknown"
+                    if kind == "note":
+                        signature = f"note:{_ringkas_teks(str(step.get('text') or '').strip().lower(), 120)}"
+                    else:
+                        try:
+                            signature = f"{kind}:{_ringkas_teks(json.dumps(step, sort_keys=True), 160)}"
+                        except Exception:
+                            signature = kind
+                signatures_saat_ini.append(signature)
+
+            if local_only_mode and signatures_saat_ini and signatures_saat_ini == rencana_signatures_terakhir:
+                final_message_ditemukan = "Planner lokal menghentikan loop karena rencana berulang."
+                break
+            if signatures_saat_ini:
+                rencana_signatures_terakhir = signatures_saat_ini
                 
         except Exception as exc:
             if not hasil_langkah_akumulasi:
@@ -1375,7 +1452,7 @@ async def run(ctx, inputs: Dict[str, Any]) -> Dict[str, Any]:
                     iter_results.append({"kind": "multimedia", "success": False, "error": "multimedia tool not available"})
                 else:
                     # Automatically inject branch_id if not provided
-                    if "branch_id" not in step:
+                    if "branch_id" not in step and branch_id_ctx:
                         step["branch_id"] = branch_id_ctx
                     hasil = await alat_multimedia(step, ctx)
                     iter_results.append(hasil)
@@ -1384,6 +1461,8 @@ async def run(ctx, inputs: Dict[str, Any]) -> Dict[str, Any]:
                 if not alat_revenue:
                     iter_results.append({"kind": "revenue", "success": False, "error": "revenue tool not available"})
                 else:
+                    if "branch_id" not in step and branch_id_ctx:
+                        step["branch_id"] = branch_id_ctx
                     hasil = await alat_revenue(step, ctx)
                     iter_results.append(hasil)
             elif kind == "schedule_job":
@@ -1479,6 +1558,15 @@ async def run(ctx, inputs: Dict[str, Any]) -> Dict[str, Any]:
 
         # Refresh memory context for next iteration
         await _muat_konteks_memori_terbaru()
+
+        if local_only_mode:
+            langkah_non_catatan = [
+                row for row in iter_results if str(row.get("kind") or "").strip().lower() not in {"", "note"}
+            ]
+            if not langkah_non_catatan:
+                if not final_message_ditemukan:
+                    final_message_ditemukan = "Planner lokal selesai: tidak ada langkah aksi lanjutan."
+                break
 
     langkah_aksi = [row for row in hasil_langkah_akumulasi if row.get("kind") in {"provider_http", "mcp_http", "local_command"}]
     sukses_total = all(bool(row.get("success")) for row in langkah_aksi) if langkah_aksi else True

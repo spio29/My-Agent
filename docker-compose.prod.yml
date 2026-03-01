@@ -47,6 +47,9 @@ services:
       - PLANNER_AI_QUEUE_WAIT_SEC=${PLANNER_AI_QUEUE_WAIT_SEC:-1.5}
       - PLANNER_AI_RELEASE_GRACE_SEC=${PLANNER_AI_RELEASE_GRACE_SEC:-30}
       - PLANNER_AI_PROVIDER_CHAIN=ollama,openai
+      - AGENT_LOCAL_ONLY=${AGENT_LOCAL_ONLY:-true}
+      - AGENT_AI_MODE=${AGENT_AI_MODE:-local}
+      - LOCAL_AI_API_KEY=${LOCAL_AI_API_KEY:-}
       - AI_NODE_URL=${AI_NODE_URL:-}
       - AI_NODE_SECRET=${AI_NODE_SECRET:-factory-secret-123}
       - AUTH_ENABLED=${AUTH_ENABLED:-false}
@@ -88,6 +91,10 @@ services:
       - NEXT_PUBLIC_API_AUTH_HEADER=${NEXT_PUBLIC_API_AUTH_HEADER:-}
       - NEXT_PUBLIC_API_AUTH_SCHEME=${NEXT_PUBLIC_API_AUTH_SCHEME:-}
       - NEXT_PUBLIC_API_TOKEN=${NEXT_PUBLIC_API_TOKEN:-}
+      - NEXT_INTERNAL_API_ORIGIN=http://api:8000
+      - NEXT_API_PROXY_AUTH_HEADER=${AUTH_TOKEN_HEADER:-Authorization}
+      - NEXT_API_PROXY_AUTH_SCHEME=${AUTH_TOKEN_SCHEME:-Bearer}
+      - NEXT_API_PROXY_TOKEN=${NEXT_PUBLIC_API_TOKEN:-}
     depends_on:
       - api
     networks:
@@ -128,6 +135,9 @@ services:
       - PLANNER_AI_QUEUE_WAIT_SEC=${PLANNER_AI_QUEUE_WAIT_SEC:-1.5}
       - PLANNER_AI_RELEASE_GRACE_SEC=${PLANNER_AI_RELEASE_GRACE_SEC:-30}
       - PLANNER_AI_PROVIDER_CHAIN=ollama,openai
+      - AGENT_LOCAL_ONLY=${AGENT_LOCAL_ONLY:-true}
+      - AGENT_AI_MODE=${AGENT_AI_MODE:-local}
+      - LOCAL_AI_API_KEY=${LOCAL_AI_API_KEY:-}
       - AI_NODE_URL=${AI_NODE_URL:-}
       - AI_NODE_SECRET=${AI_NODE_SECRET:-factory-secret-123}
       - TELEGRAM_NOTIF_TOKEN=${TELEGRAM_NOTIF_TOKEN:-}
@@ -187,6 +197,7 @@ services:
       dockerfile: Dockerfile.worker
     container_name: spio-connector
     restart: always
+    command: python -m app.services.connector.main
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
@@ -203,6 +214,10 @@ services:
       - PLANNER_AI_PROVIDER_CHAIN=ollama,openai
       - AI_NODE_URL=${AI_NODE_URL:-}
       - AI_NODE_SECRET=${AI_NODE_SECRET:-factory-secret-123}
+      - API_INTERNAL_ORIGIN=http://api:8000
+      - CONNECTOR_API_TOKEN=${NEXT_PUBLIC_API_TOKEN:-}
+      - CONNECTOR_API_AUTH_HEADER=${AUTH_TOKEN_HEADER:-Authorization}
+      - CONNECTOR_API_AUTH_SCHEME=${AUTH_TOKEN_SCHEME:-Bearer}
       - TELEGRAM_NOTIF_TOKEN=${TELEGRAM_NOTIF_TOKEN:-}
       - TELEGRAM_NOTIF_CHAT_ID=${TELEGRAM_NOTIF_CHAT_ID:-}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}

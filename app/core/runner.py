@@ -22,6 +22,7 @@ class JobContext:
         metrics,
         span,
         timeout_ms: int,
+        inputs: Optional[Dict[str, Any]] = None,
     ):
         self.job_id = job_id
         self.run_id = run_id
@@ -32,6 +33,14 @@ class JobContext:
         self.metrics = metrics
         self.span = span
         self.timeout_ms = timeout_ms
+        self.inputs = inputs or {}
+
+        branch_id = str(self.inputs.get("branch_id") or self.inputs.get("target_branch_id") or "").strip()
+        if not branch_id:
+            flow_group = str(self.inputs.get("flow_group") or "").strip()
+            if flow_group.lower().startswith("br_"):
+                branch_id = flow_group
+        self.branch_id = branch_id
 
 
 async def execute_job_handler(handler: Callable, ctx: JobContext, inputs: Dict) -> RunResult:
@@ -232,6 +241,7 @@ async def process_job_event(
             metrics=metrics,
             span=None,
             timeout_ms=timeout_ms,
+            inputs=inputs,
         )
 
         # Execute handler

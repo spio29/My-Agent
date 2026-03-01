@@ -10,9 +10,11 @@ from app.core.queue import (
     append_event,
     dequeue_job,
     get_job_spec,
+    get_run,
     init_queue,
     is_mode_fallback_redis,
     is_mode_legacy_redis_queue,
+    save_run,
 )
 from app.core.redis_client import redis_client
 from app.core.registry import policy_manager, tool_registry
@@ -25,6 +27,7 @@ from app.core.tools.messaging import MessagingTool
 from app.core.tools.metrics import MetricsTool
 from app.core.tools.multimedia import MultimediaTool
 from app.core.tools.revenue import RevenueTool
+from app.core.models import RunResult, RunStatus
 
 AGENT_HEARTBEAT_TTL = 30
 
@@ -118,6 +121,14 @@ async def _proses_satu_job(worker_id: str, data_event: dict):
             f"No handler found for job type: {tipe_job}",
             extra={"run_id": data_event.get("run_id"), "job_id": data_event.get("job_id")},
         )
+        run_id = str(data_event.get("run_id") or "").strip()
+        if run_id:
+            data_run = await get_run(run_id)
+            if data_run:
+                data_run.status = RunStatus.FAILED
+                data_run.finished_at = datetime.now(timezone.utc)
+                data_run.result = RunResult(success=False, error=f"No handler for {tipe_job}")
+                await save_run(data_run)
         await append_event(
             "run.failed",
             {
