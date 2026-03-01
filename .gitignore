@@ -47,3 +47,4 @@ Thumbs.db
 .clawhub/
 skills/
 !ui/src/app/skills/
+ops/no-code/.watchdog_state.json
