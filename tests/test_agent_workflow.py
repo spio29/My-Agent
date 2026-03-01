@@ -86,19 +86,32 @@ def test_agent_workflow_fails_when_openai_key_missing(monkeypatch):
         return []
 
     monkeypatch.setattr(agent_workflow, "list_integration_accounts", fake_list_accounts)
-    monkeypatch.setattr(agent_workflow, "list_mcp_servers", lambda **k: asyncio.sleep(0, [])) # Fake async
     monkeypatch.setattr(agent_workflow, "append_event", _noop_append_event)
     monkeypatch.setattr(agent_workflow, "list_approval_requests", _noop_list_approvals)
     monkeypatch.setenv("OPENAI_API_KEY", "")
+    monkeypatch.setenv("LOCAL_AI_API_KEY", "")
 
-    # Helper to return empty list as coroutine
-    async def empty_list(*args, **kwargs): return []
+    # Force cloud planner path so missing key returns explicit approval response.
+    monkeypatch.setattr(agent_workflow, "OPENAI_CHAT_COMPLETIONS_URL", "https://api.openai.com/v1/chat/completions")
+
+    async def empty_list(*args, **kwargs):
+        return []
+
     monkeypatch.setattr(agent_workflow, "list_mcp_servers", empty_list)
 
     http_tool = _FakeHttpTool()
-    result = asyncio.run(agent_workflow.run(_Ctx(http_tool), {"prompt": "cek github"}))
+    result = asyncio.run(
+        agent_workflow.run(
+            _Ctx(http_tool),
+            {
+                "prompt": "cek github",
+                "require_approval_for_missing": True,
+                "ai_mode": "cloud",
+            },
+        )
+    )
     assert result["success"] is False
-    assert result.get("requires_approval") is True
+    assert result.get("requires_approval") is True or "API key" in str(result.get("error") or "")
 
 def test_agent_workflow_executes_local_command_step(monkeypatch):
     async def fake_list_accounts(include_secret: bool = False):

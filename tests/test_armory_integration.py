@@ -1,51 +1,82 @@
-import pytest
-import asyncio
 import uuid
-from app.core.armory import add_account, get_account, list_all_accounts, update_account_status
+
+import pytest
+import redis.asyncio as redis_async
+
+import app.core.armory as armory_mod
+import app.core.queue as queue_mod
+import app.core.redis_client as redis_client_mod
+from app.core.armory import add_account, get_account
+from app.core.config import settings
 from app.core.models import AccountStatus
 from app.services.worker.main import _proses_satu_job
 
+
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"
+
+
+@pytest.fixture(autouse=True)
+async def _reset_redis_client_per_test():
+    fresh_client = redis_async.Redis(
+        host=settings.REDIS_HOST,
+        port=settings.REDIS_PORT,
+        db=settings.REDIS_DB,
+        password=settings.REDIS_PASSWORD,
+        decode_responses=True,
+        encoding="utf-8",
+        socket_connect_timeout=0.2,
+        socket_timeout=0.2,
+        retry_on_timeout=False,
+    )
+
+    old_shared = redis_client_mod.redis_client
+    old_queue = queue_mod.redis_client
+    old_armory = armory_mod.redis_client
+
+    redis_client_mod.redis_client = fresh_client
+    queue_mod.redis_client = fresh_client
+    armory_mod.redis_client = fresh_client
+
+    try:
+        yield
+    finally:
+        try:
+            await fresh_client.aclose()
+        except Exception:
+            pass
+        redis_client_mod.redis_client = old_shared
+        queue_mod.redis_client = old_queue
+        armory_mod.redis_client = old_armory
+
+
 @pytest.mark.anyio
 async def test_armory_stealth_onboarding_flow(anyio_backend):
-    # Ensure we only run on asyncio to avoid trio errors in some environments
     if anyio_backend != "asyncio":
         return
 
-    # 1. Simulate Chairman adding an account
     username = f"warrior_{uuid.uuid4().hex[:4]}"
     acc = await add_account(
         platform="instagram",
         username=username,
         password="secret_password_123",
-        proxy="1.2.3.4:8080"
+        proxy="1.2.3.4:8080",
     )
-    
+
     account_id = acc["account_id"]
     assert acc["status"] == AccountStatus.PENDING
-    
-    # 2. Verify it's in the database
+
     fetched = await get_account(account_id)
     assert fetched["username"] == username
-    
-    # 3. Simulate Worker catching the event
+
     event = {
         "type": "armory.account_added",
-        "data": {"account_id": account_id}
+        "data": {"account_id": account_id},
     }
-    
-    # We call the worker logic directly
+
     await _proses_satu_job("worker_test", event)
-    
-    # 4. Verify account is now READY
+
     final_acc = await get_account(account_id)
     assert final_acc["status"] == AccountStatus.READY
     assert final_acc["last_active"] is not None
-    
-    # 5. Cleanup Redis connection to avoid event loop issues
-    from app.core.redis_client import redis_client
-    if hasattr(redis_client, 'connection_pool'):
-        await redis_client.connection_pool.disconnect()
-
-@pytest.fixture
-def anyio_backend():
-    return 'asyncio'

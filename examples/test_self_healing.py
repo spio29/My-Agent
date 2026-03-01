@@ -10,12 +10,60 @@ Usage:
 import asyncio
 import sys
 import os
+import uuid
+
+import pytest
+import redis.asyncio as redis_async
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import json
 from datetime import datetime, timezone
+from app.core.config import settings
+import app.core.queue as queue_mod
+import app.core.redis_client as redis_client_mod
+
+
+pytestmark = pytest.mark.anyio
+
+
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"
+
+
+@pytest.fixture(autouse=True)
+async def _reset_redis_client_per_test():
+    # AnyIO membuat event loop baru per test; refresh client singleton agar tidak nyangkut loop lama.
+    fresh_client = redis_async.Redis(
+        host=settings.REDIS_HOST,
+        port=settings.REDIS_PORT,
+        db=settings.REDIS_DB,
+        password=settings.REDIS_PASSWORD,
+        decode_responses=True,
+        encoding="utf-8",
+        socket_connect_timeout=0.2,
+        socket_timeout=0.2,
+        retry_on_timeout=False,
+    )
+
+    old_queue_client = queue_mod.redis_client
+    old_shared_client = redis_client_mod.redis_client
+    queue_mod.redis_client = fresh_client
+    redis_client_mod.redis_client = fresh_client
+
+    try:
+        yield
+    finally:
+        try:
+            await fresh_client.aclose()
+        except Exception:
+            pass
+        queue_mod.redis_client = old_queue_client
+        redis_client_mod.redis_client = old_shared_client
+
+
 from app.core.queue import (
     record_job_outcome,
     get_job_failure_state,
@@ -31,7 +79,7 @@ async def test_self_healing_basic():
     print("TEST 1: BASIC SELF-HEALING FLOW")
     print("=" * 80)
     
-    job_id = "test-self-heal-1"
+    job_id = f"test-self-heal-1-{uuid.uuid4().hex[:6]}"
     
     # Simulate 3 consecutive failures
     print(f"\nSimulating 3 consecutive failures for job '{job_id}'...")
@@ -73,7 +121,7 @@ async def test_exponential_backoff():
     print("TEST 2: EXPONENTIAL BACKOFF")
     print("=" * 80)
     
-    job_id = "test-self-heal-2"
+    job_id = f"test-self-heal-2-{uuid.uuid4().hex[:6]}"
     cooldown_base = 10  # 10 seconds
     
     print(f"\nSimulating failures with exponential backoff (base={cooldown_base}s)...")
@@ -111,7 +159,7 @@ async def test_auto_reset_on_success():
     print("TEST 3: AUTO-RESET ON SUCCESS")
     print("=" * 80)
     
-    job_id = "test-self-heal-3"
+    job_id = f"test-self-heal-3-{uuid.uuid4().hex[:6]}"
     
     # First, create some failures
     print(f"\nCreating 3 failures...")
@@ -161,7 +209,7 @@ async def test_intermittent_failures():
     print("TEST 4: INTERMITTENT FAILURES (NO COOLDOWN)")
     print("=" * 80)
     
-    job_id = "test-self-heal-4"
+    job_id = f"test-self-heal-4-{uuid.uuid4().hex[:6]}"
     
     # Pattern: Success, Fail, Success, Fail, Success
     print(f"\nSimulating intermittent failures...")
@@ -199,7 +247,7 @@ async def test_max_cooldown_cap():
     print("TEST 5: MAXIMUM COOLDOWN CAP")
     print("=" * 80)
     
-    job_id = "test-self-heal-5"
+    job_id = f"test-self-heal-5-{uuid.uuid4().hex[:6]}"
     cooldown_max = 60  # 60 seconds max
     
     print(f"\nSimulating many failures (max_cooldown={cooldown_max}s)...")
