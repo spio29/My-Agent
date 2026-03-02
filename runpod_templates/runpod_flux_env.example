@@ -1,0 +1,8 @@
+IMAGE_MODEL_ID=black-forest-labs/FLUX.1-schnell
+IMAGE_TORCH_DTYPE=float16
+OUTPUT_S3_BUCKET=your-bucket-name
+OUTPUT_S3_REGION=ap-southeast-1
+OUTPUT_S3_ACCESS_KEY_ID=your-access-key
+OUTPUT_S3_SECRET_ACCESS_KEY=your-secret-key
+OUTPUT_S3_PUBLIC_BASE_URL=
+OUTPUT_PREFIX_IMAGE=spio/images
