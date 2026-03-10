@@ -14,12 +14,12 @@ import {
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/", label: "Overview", icon: LayoutDashboard, available: true },
-  { href: "/influencers", label: "Influencers", icon: UsersRound, available: false },
-  { href: "/workflows", label: "Workflows", icon: Workflow, available: false },
-  { href: "/runs", label: "Runs", icon: PlaySquare, available: true },
-  { href: "/incidents", label: "Incidents", icon: AlertTriangle, available: false },
-  { href: "/settings", label: "Settings", icon: Settings2, available: true },
+  { href: "/", label: "Overview", icon: LayoutDashboard },
+  { href: "/influencers", label: "Influencers", icon: UsersRound },
+  { href: "/workflows", label: "Workflows", icon: Workflow },
+  { href: "/runs", label: "Runs", icon: PlaySquare },
+  { href: "/incidents", label: "Incidents", icon: AlertTriangle },
+  { href: "/settings", label: "Settings", icon: Settings2 },
 ];
 
 export default function SidebarNav() {
@@ -37,19 +37,8 @@ export default function SidebarNav() {
           "flex shrink-0 items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
           isActive
             ? "bg-slate-900 text-white"
-            : item.available
-              ? "text-slate-700 hover:bg-white hover:text-slate-950"
-              : "text-slate-400",
+            : "text-slate-700 hover:bg-white hover:text-slate-950",
         );
-
-        if (!item.available) {
-          return (
-            <span key={item.href} aria-disabled="true" className={itemClassName}>
-              <Icon className="h-4 w-4" />
-              <span>{item.label}</span>
-            </span>
-          );
-        }
 
         return (
           <Link key={item.href} href={item.href} className={itemClassName}>

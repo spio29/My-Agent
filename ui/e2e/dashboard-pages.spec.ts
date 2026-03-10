@@ -25,3 +25,14 @@ test("overview shows neutral operator navigation", async ({ page }) => {
     "Settings",
   ]);
 });
+
+test("overview prioritizes actions and links to new routes", async ({ page }) => {
+  await page.goto("/");
+
+  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+  await expect(page.getByText("Needs attention")).toBeVisible();
+
+  await page.getByRole("link", { name: "Influencers" }).click();
+  await expect(page).toHaveURL(/\/influencers$/);
+  await expect(page.getByRole("heading", { name: "Influencers" })).toBeVisible();
+});
