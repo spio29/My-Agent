@@ -61,13 +61,13 @@ export default function DetailDrawer({
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-slate-900/20" onClick={onClose} />
+      <div className="fixed inset-0 z-40 bg-black/55" onClick={onClose} />
       <aside
         aria-label="Operator detail"
-        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.16)]"
+        className="workspace-drawer fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l"
         role="complementary"
       >
-        <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+        <div className="flex items-start justify-between gap-4 border-b border-stone-800 px-5 py-4">
           <div>
             <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">
               Operator detail
@@ -77,7 +77,7 @@ export default function DetailDrawer({
           </div>
           <button
             aria-label="Close detail"
-            className="rounded-md border border-slate-200 p-2 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700"
+            className="rounded-[8px] border border-stone-800 p-2 text-stone-400 transition-colors hover:bg-stone-900 hover:text-stone-100"
             type="button"
             onClick={onClose}
           >
@@ -91,7 +91,10 @@ export default function DetailDrawer({
           {fields.length > 0 ? (
             <dl className="grid gap-3 sm:grid-cols-2">
               {fields.map((field) => (
-                <div key={field.label} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                <div
+                  key={field.label}
+                  className="rounded-[8px] border border-stone-800 bg-stone-950/60 px-3 py-3"
+                >
                   <dt className="text-sm text-slate-500">{field.label}</dt>
                   <dd className="mt-1 text-sm font-medium text-slate-900">{field.value}</dd>
                 </div>
@@ -111,7 +114,7 @@ export default function DetailDrawer({
           ))}
         </div>
 
-        {footer ? <div className="border-t border-slate-200 px-5 py-4">{footer}</div> : null}
+        {footer ? <div className="border-t border-stone-800 px-5 py-4">{footer}</div> : null}
       </aside>
     </>
   );

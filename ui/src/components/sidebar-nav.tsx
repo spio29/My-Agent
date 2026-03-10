@@ -29,16 +29,16 @@ export default function SidebarNav() {
   return (
     <nav
       aria-label="Primary"
-      className="no-scrollbar flex flex-nowrap gap-2 overflow-x-auto pb-1 lg:flex-col lg:gap-1.5 lg:overflow-visible lg:pb-0"
+      className="workspace-nav no-scrollbar flex flex-nowrap gap-2 overflow-x-auto pb-1 lg:flex-col lg:gap-1.5 lg:overflow-visible lg:pb-0"
     >
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive = normalizedPathname === item.href;
         const itemClassName = cn(
-          "flex shrink-0 items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+          "workspace-nav__link flex shrink-0 items-center gap-3 rounded-[8px] px-3 py-2 text-sm transition-colors",
           isActive
-            ? "bg-slate-900 text-white"
-            : "text-slate-700 hover:bg-white hover:text-slate-950",
+            ? "is-active bg-transparent text-stone-100"
+            : "text-stone-400 hover:bg-stone-900/60 hover:text-stone-100",
         );
 
         return (

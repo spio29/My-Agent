@@ -18,6 +18,14 @@ test("overview shows neutral operator navigation", async ({ page }) => {
   }
 });
 
+test("overview uses the dark avant workspace framing", async ({ page }) => {
+  await page.goto("/");
+
+  await expect(page.locator("body")).toHaveAttribute("data-shell-tone", "dark-avant");
+  await expect(page.getByRole("heading", { name: "Action ribbon", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Incident spine", exact: true })).toBeVisible();
+});
+
 test("overview prioritizes actions and links to new routes", async ({ page }) => {
   await page.goto("/");
 

@@ -5,11 +5,11 @@ import { cn } from "@/lib/utils";
 type StatusTone = "neutral" | "info" | "success" | "warning" | "critical";
 
 const toneClassName: Record<StatusTone, string> = {
-  neutral: "border-slate-200 bg-slate-100 text-slate-700",
-  info: "border-stone-300 bg-stone-100 text-stone-700",
-  success: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  warning: "border-amber-200 bg-amber-50 text-amber-700",
-  critical: "border-rose-200 bg-rose-50 text-rose-700",
+  neutral: "border-stone-700 bg-stone-900/70 text-stone-300",
+  info: "border-lime-800 bg-lime-950/60 text-lime-300",
+  success: "border-emerald-800 bg-emerald-950/60 text-emerald-300",
+  warning: "border-amber-800 bg-amber-950/60 text-amber-300",
+  critical: "border-rose-900 bg-rose-950/60 text-rose-300",
 };
 
 type StatusPillProps = {
@@ -26,7 +26,7 @@ export default function StatusPill({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-md border px-2 py-1 text-xs font-medium",
+        "status-pill inline-flex items-center rounded-[8px] border px-2 py-1 text-xs font-medium",
         toneClassName[tone],
         className,
       )}

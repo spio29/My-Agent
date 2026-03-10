@@ -307,11 +307,15 @@ export default function OverviewPage() {
     return true;
   });
 
+  const incidentSpineItems = attentionItems.filter(
+    (item) => item.level !== "medium" || item.owner === "Incidents",
+  );
+
   return (
     <>
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="max-w-2xl">
+      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_240px] xl:items-end">
+          <div className="max-w-3xl">
             <h2 className="text-3xl font-semibold tracking-[-0.03em] text-slate-950">Overview</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
               Workspace operator campuran untuk memantau portofolio influencer, workflow aktif,
@@ -319,7 +323,7 @@ export default function OverviewPage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="overview-action-row xl:justify-end">
             <Link
               href="/influencers"
               className="inline-flex items-center gap-2 rounded-md border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
@@ -337,62 +341,69 @@ export default function OverviewPage() {
           </div>
         </div>
 
-        <SectionShell
-          title="Needs attention"
-          description="Item yang perlu tindakan operator sekarang, tanpa keluar dari konteks overview."
-          actions={<span className="text-sm text-slate-500">{visibleAttentionItems.length} open</span>}
-        >
-          <FilterBar items={attentionFilters} value={attentionFilter} onChange={setAttentionFilter} />
-          <div className="mt-4 divide-y divide-slate-200">
-            {visibleAttentionItems.map((item) => (
-              <article
-                key={item.id}
-                className="grid gap-4 py-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h4 className="text-base font-semibold text-slate-950">{item.title}</h4>
-                    <StatusPill tone={attentionToneMap[item.level]}>{item.level}</StatusPill>
-                    <span className="text-sm text-slate-500">{item.owner}</span>
-                  </div>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">{item.detail}</p>
-                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
-                    <span>Assignee: {item.assignee}</span>
-                    <span>Target: {item.dueLabel}</span>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2 md:justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setDrawerContent(buildAttentionDrawer(item))}
-                    className="rounded-md border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
-                  >
-                    Review
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                  >
-                    Assign
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        </SectionShell>
-
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+        <div className="overview-avant-grid">
           <SectionShell
-            title="Portfolio status"
-            description="Ringkasan coverage akun dan binding yang paling dekat dengan tindakan operator."
-            actions={<UsersRound className="h-4 w-4 text-slate-400" />}
+            title="Action ribbon"
+            description="Needs attention yang harus diputuskan operator sekarang, disusun sebagai pita kerja yang bisa disisir cepat."
+            actions={<span className="text-sm text-slate-500">{visibleAttentionItems.length} open</span>}
+            className="overview-ribbon workspace-panel--ribbon"
+            contentClassName="pt-5"
           >
-            <div className="space-y-3">
+            <FilterBar
+              items={attentionFilters}
+              value={attentionFilter}
+              onChange={setAttentionFilter}
+              className="mb-4"
+            />
+            <div className="overview-ribbon__list">
+              {visibleAttentionItems.map((item) => (
+                <article key={item.id} className="overview-ribbon__item">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h4 className="text-base font-semibold text-slate-950">{item.title}</h4>
+                      <StatusPill tone={attentionToneMap[item.level]}>{item.level}</StatusPill>
+                    </div>
+                    <p className="mt-3 text-sm leading-6 text-slate-600">{item.detail}</p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
+                      <span>{item.owner}</span>
+                      <span>{item.assignee}</span>
+                      <span>{item.dueLabel}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setDrawerContent(buildAttentionDrawer(item))}
+                        className="rounded-md border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+                      >
+                        Review
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                      >
+                        Assign
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </SectionShell>
+
+          <SectionShell
+            title="Portfolio ledger"
+            description="Coverage akun dan binding yang paling dekat dengan tindakan operator."
+            actions={<UsersRound className="h-4 w-4 text-slate-400" />}
+            className="overview-ledger workspace-panel--index"
+          >
+            <div className="overview-sheet__stack">
               {portfolioRows.map((row) => (
                 <article
                   key={row.name}
-                  className="grid gap-3 rounded-lg border border-slate-200 bg-stone-50 px-4 py-3 md:grid-cols-[minmax(0,1fr)_auto]"
+                  className="overview-ledger__row grid gap-3 rounded-[10px] px-4 py-4 md:grid-cols-[minmax(0,1fr)_auto]"
                 >
                   <div>
                     <h4 className="text-sm font-semibold text-slate-950">{row.name}</h4>
@@ -408,15 +419,16 @@ export default function OverviewPage() {
           </SectionShell>
 
           <SectionShell
-            title="Workflow health"
-            description="Lane aktif yang sedang stabil dan yang perlu verifikasi operator."
+            title="Lane board"
+            description="Workflow aktif yang masih sehat dan yang perlu verifikasi operator."
             actions={<Workflow className="h-4 w-4 text-slate-400" />}
+            className="overview-lanes"
           >
             <div className="space-y-3">
               {workflowRows.map((row) => (
                 <article
                   key={row.name}
-                  className="rounded-lg border border-slate-200 bg-white px-4 py-3"
+                  className="overview-lanes__row rounded-[10px] px-4 py-4"
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <h4 className="text-sm font-semibold text-slate-950">{row.name}</h4>
@@ -427,49 +439,84 @@ export default function OverviewPage() {
               ))}
             </div>
           </SectionShell>
-        </div>
 
-        <SectionShell
-          title="Recent runs"
-          description="Run terbaru yang masih perlu konteks, retry, atau pengecekan hasil."
-          actions={<span className="text-sm text-slate-500">{visibleRunRows.length} visible</span>}
-        >
-          <FilterBar items={runFilters} value={runFilter} onChange={setRunFilter} />
-          <div className="mt-4 divide-y divide-slate-200">
-            {visibleRunRows.map((row) => (
-              <article
-                key={row.id}
-                className="grid gap-4 py-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h4 className="text-sm font-semibold text-slate-950">{row.name}</h4>
-                    <StatusPill tone={runToneMap[row.state]}>{row.state}</StatusPill>
+          <SectionShell
+            title="Run ledger"
+            description="Recent runs yang masih perlu konteks, retry, atau pengecekan hasil."
+            actions={<span className="text-sm text-slate-500">{visibleRunRows.length} visible</span>}
+            className="overview-runs"
+            contentClassName="pt-5"
+          >
+            <FilterBar items={runFilters} value={runFilter} onChange={setRunFilter} className="mb-4" />
+            <div className="space-y-3">
+              {visibleRunRows.map((row) => (
+                <article
+                  key={row.id}
+                  className="overview-runs__row grid gap-4 rounded-[10px] px-4 py-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h4 className="text-sm font-semibold text-slate-950">{row.name}</h4>
+                      <StatusPill tone={runToneMap[row.state]}>{row.state}</StatusPill>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{row.note}</p>
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">{row.note}</p>
-                </div>
 
-                <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                  <span className="inline-flex items-center gap-1 text-sm text-slate-500">
-                    {row.state === "Queued" ? (
-                      <Clock3 className="h-4 w-4" />
-                    ) : (
-                      <RefreshCw className="h-4 w-4" />
-                    )}
-                    {row.time}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setDrawerContent(buildRunDrawer(row))}
-                    className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                  >
-                    Inspect
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        </SectionShell>
+                  <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                    <span className="inline-flex items-center gap-1 text-sm text-slate-500">
+                      {row.state === "Queued" ? (
+                        <Clock3 className="h-4 w-4" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                      {row.time}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setDrawerContent(buildRunDrawer(row))}
+                      className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                    >
+                      Inspect
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </SectionShell>
+
+          <SectionShell
+            title="Incident spine"
+            description="Kolom triase sempit untuk issue yang paling cepat memotong jalur kerja."
+            className="overview-spine workspace-panel--spine"
+          >
+            <div className="overview-spine__list">
+              {incidentSpineItems.map((item) => (
+                <article key={item.id} className="overview-spine__item">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h4 className="text-sm font-semibold text-slate-950">{item.title}</h4>
+                      <StatusPill tone={attentionToneMap[item.level]}>{item.level}</StatusPill>
+                    </div>
+                    <p className="overview-spine__body mt-3">{item.detail}</p>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="overview-spine__meta">
+                      <span>{item.owner}</span>
+                      <span>{item.assignee}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setDrawerContent(buildAttentionDrawer(item))}
+                      className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                    >
+                      Open
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </SectionShell>
+        </div>
       </div>
 
       <DetailDrawer

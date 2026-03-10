@@ -10,7 +10,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="id">
-      <body>
+      <body data-shell-tone="dark-avant">
         <Providers>
           <div className="app-shell">
             <div className="app-sidebar">
@@ -30,11 +30,15 @@ export default function RootLayout({
                 <SidebarNav />
               </div>
               <header className="app-header">
-                <div>
+                <div className="app-header__block">
                   <h1 className="app-title">Operator Workspace</h1>
                   <p className="app-subtitle">
                     Monitor portfolio, workflows, runs, and incidents in one place.
                   </p>
+                </div>
+                <div className="app-header__note">
+                  Live route
+                  <span>production active</span>
                 </div>
               </header>
               <div className="app-content">{children}</div>
