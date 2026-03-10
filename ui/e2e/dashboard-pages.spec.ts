@@ -45,3 +45,13 @@ test("influencers page shows list, detail, and account sections", async ({ page 
   await expect(page.getByRole("heading", { name: "Platform bindings" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Accounts" })).toBeVisible();
 });
+
+test("workflows and runs pages support operator inspection", async ({ page }) => {
+  await page.goto("/workflows");
+  await expect(page.getByRole("heading", { name: "Workflows", exact: true })).toBeVisible();
+  await expect(page.getByText("Active workflows")).toBeVisible();
+
+  await page.goto("/runs");
+  await expect(page.getByRole("heading", { name: "Runs", exact: true })).toBeVisible();
+  await expect(page.getByPlaceholder("Search runs")).toBeVisible();
+});
