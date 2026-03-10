@@ -13,13 +13,13 @@ export default function RootLayout({
       <body>
         <Providers>
           <div className="app-shell">
-            <aside className="app-sidebar">
+            <div className="app-sidebar">
               <div className="app-brand">
                 <span className="app-brand__name">Portfolio Ops</span>
                 <span className="app-brand__meta">Operator workspace</span>
               </div>
               <SidebarNav />
-            </aside>
+            </div>
 
             <main className="app-main">
               <div className="app-mobile-shell">

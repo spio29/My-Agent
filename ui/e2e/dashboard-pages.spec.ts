@@ -27,3 +27,11 @@ test("overview prioritizes actions and links to new routes", async ({ page }) =>
   await expect(page).toHaveURL(/\/influencers$/);
   await expect(page.getByRole("heading", { name: "Influencers" })).toBeVisible();
 });
+
+test("overview opens action detail in a side panel", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByRole("button", { name: /review/i }).first().click();
+  await expect(page.getByRole("complementary")).toBeVisible();
+  await expect(page.getByText("Operator detail")).toBeVisible();
+});
