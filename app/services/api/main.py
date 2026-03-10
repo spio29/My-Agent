@@ -7,7 +7,7 @@ from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
@@ -1162,6 +1162,11 @@ async def on_shutdown():
 @app.get("/healthz")
 async def healthz():
     return {"status": "healthy"}
+
+
+@app.head("/healthz")
+async def healthz_head():
+    return Response(status_code=200)
 
 
 @app.get("/readyz")
