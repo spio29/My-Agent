@@ -1336,9 +1336,15 @@ export const getInfluencerTemplates = async (limit = 200): Promise<InfluencerTem
   }
 };
 
-export const getInfluencerProfiles = async (limit = 200): Promise<InfluencerProfile[]> => {
+export interface ListInfluencerProfilesParams {
+  limit?: number;
+}
+
+export const getInfluencerProfiles = async (
+  params?: ListInfluencerProfilesParams,
+): Promise<InfluencerProfile[]> => {
   try {
-    const query = new URLSearchParams({ limit: String(limit) });
+    const query = new URLSearchParams({ limit: String(params?.limit ?? 200) });
     return await getJson<InfluencerProfile[]>(`/influencer/profiles?${query.toString()}`);
   } catch (error) {
     return handleApiError(error, "Gagal memuat profile influencer", []);

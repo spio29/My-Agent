@@ -35,3 +35,12 @@ test("overview opens action detail in a side panel", async ({ page }) => {
   await expect(page.getByRole("complementary")).toBeVisible();
   await expect(page.getByText("Operator detail")).toBeVisible();
 });
+
+test("influencers page shows list, detail, and account sections", async ({ page }) => {
+  await page.goto("/influencers");
+
+  await expect(page.getByRole("heading", { name: "Influencers" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Portfolio" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Platform bindings" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Accounts" })).toBeVisible();
+});
