@@ -34,7 +34,7 @@ CONTAINERS = [
     "spio-redis",
     "spio-api",
     "spio-connector",
-    "spio-dashboard",
+    "spio-operator-ui",
     "spio-worker",
     "spio-scheduler",
 ]

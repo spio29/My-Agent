@@ -147,8 +147,8 @@ def _load_cors_allowed_origins() -> List[str]:
     default_origins = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "http://localhost:5174",
-        "http://127.0.0.1:5174",
+        "http://localhost:5178",
+        "http://127.0.0.1:5178",
     ]
 
     raw = str(os.getenv("CORS_ALLOW_ORIGINS") or "").strip()

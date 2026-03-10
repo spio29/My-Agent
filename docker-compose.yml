@@ -26,12 +26,19 @@ services:
     build:
       context: ./ui
       dockerfile: Dockerfile.ui
-    container_name: spio-dashboard
+    container_name: spio-operator-ui
     ports:
-      - 3001:3000
+      - 5178:3000
     env_file: .env
     environment:
-      - NEXT_PUBLIC_API_BASE=http://213.163.193.6:8000
+      - NEXT_PUBLIC_API_BASE=/api
+      - NEXT_PUBLIC_API_AUTH_HEADER=${NEXT_PUBLIC_API_AUTH_HEADER:-}
+      - NEXT_PUBLIC_API_AUTH_SCHEME=${NEXT_PUBLIC_API_AUTH_SCHEME:-}
+      - NEXT_PUBLIC_API_TOKEN=${NEXT_PUBLIC_API_TOKEN:-}
+      - NEXT_INTERNAL_API_ORIGIN=http://api:8000
+      - NEXT_API_PROXY_AUTH_HEADER=${AUTH_TOKEN_HEADER:-Authorization}
+      - NEXT_API_PROXY_AUTH_SCHEME=${AUTH_TOKEN_SCHEME:-Bearer}
+      - NEXT_API_PROXY_TOKEN=${NEXT_PUBLIC_API_TOKEN:-}
     depends_on: [api]
     restart: always
   unit-agency:

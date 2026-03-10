@@ -8,7 +8,7 @@ Repo: `spio29/My-Agent` (branch `master`)
 - `e5a4c90` test: stabilize async redis tests and e2e api auth headers
 
 ## Status sistem saat ini
-- Stack utama aktif: `spio-api`, `spio-dashboard`, `spio-connector`, `spio-worker`, `spio-scheduler`, `spio-redis`.
+- Stack utama aktif: `spio-api`, `spio-operator-ui`, `spio-connector`, `spio-worker`, `spio-scheduler`, `spio-redis`.
 - No-code ops aktif untuk influencer `inf_001..inf_010`.
 - Telegram `/ops` aktif untuk:
   - `status`, `nyala`, `mati`, `strategi`, `nada`, `followup`, `ritme`, `jadwal`, `kanal`, `rantai`, `paket`.
@@ -20,7 +20,7 @@ Repo: `spio29/My-Agent` (branch `master`)
     - `docker exec spio-api python3 -m pytest -q`
 - E2E tests: `7 passed`.
   - Command:
-    - `cd ui && E2E_UI_BASE_URL=http://127.0.0.1:3001 E2E_API_BASE_URL=http://127.0.0.1:8000 npm run e2e`
+    - `cd ui && E2E_UI_BASE_URL=http://127.0.0.1:5178 E2E_API_BASE_URL=http://127.0.0.1:8000 npm run e2e`
 
 ## Cara lanjut cepat (operator)
 1. Cek status no-code:

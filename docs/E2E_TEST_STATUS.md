@@ -161,7 +161,7 @@ npx playwright test -g "halaman prompt bisa eksekusi"
 
 ### Test Environment Variables
 ```bash
-E2E_UI_BASE_URL=http://127.0.0.1:5174    # Default UI port
+E2E_UI_BASE_URL=http://127.0.0.1:5178    # Default UI port
 E2E_API_BASE_URL=http://127.0.0.1:8000   # Default API port
 E2E_USE_SYSTEM_CHROME=1                  # Gunakan Chrome terinstall
 ```

@@ -17,10 +17,8 @@ poetry.lock
 # Node / Next.js
 node_modules/
 ui/node_modules/
-ui-simple/node_modules/
 .next/
 ui/.next/
-ui-simple/.next/
 ui/test-results/
 ui/playwright-report/
 ui/blob-report/

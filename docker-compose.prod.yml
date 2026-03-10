@@ -76,16 +76,16 @@ services:
           memory: 1G
 
   # ===========================================
-  # UI Dashboard - Next.js
+  # Operator UI - Next.js
   # ===========================================
   ui:
     build:
       context: ./ui
       dockerfile: Dockerfile.ui
-    container_name: spio-dashboard
+    container_name: spio-operator-ui
     restart: always
     ports:
-      - "3001:3000"
+      - "5178:3000"
     environment:
       - NEXT_PUBLIC_API_BASE=/api
       - NEXT_PUBLIC_API_AUTH_HEADER=${NEXT_PUBLIC_API_AUTH_HEADER:-}

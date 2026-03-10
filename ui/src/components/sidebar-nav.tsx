@@ -13,17 +13,6 @@ import {
 
 import { cn } from "@/lib/utils";
 
-const normalizePathPrefix = (value: string | undefined): string => {
-  const trimmed = String(value || "").trim();
-  if (!trimmed || trimmed === "/") {
-    return "";
-  }
-
-  return `/${trimmed.replace(/^\/+|\/+$/g, "")}`;
-};
-
-const APP_BASE_PATH = normalizePathPrefix(process.env.NEXT_PUBLIC_BASE_PATH);
-
 const navItems = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/influencers", label: "Influencers", icon: UsersRound },
@@ -35,10 +24,7 @@ const navItems = [
 
 export default function SidebarNav() {
   const pathname = usePathname();
-  const normalizedPathname =
-    APP_BASE_PATH && (pathname === APP_BASE_PATH || pathname.startsWith(`${APP_BASE_PATH}/`))
-      ? pathname.slice(APP_BASE_PATH.length) || "/"
-      : pathname;
+  const normalizedPathname = pathname || "/";
 
   return (
     <nav

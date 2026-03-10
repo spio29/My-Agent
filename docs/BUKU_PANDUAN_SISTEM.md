@@ -339,7 +339,7 @@ Gejala:
 - `EADDRINUSE`
 
 Solusi:
-1. Matikan proses yang pakai port (`3000` atau `5174`).
+1. Matikan proses yang pakai port (`3000` atau `5178`).
 2. Jalankan ulang `stop-local.ps1` lalu `start-local.ps1`.
 
 ### 12.5 Kamus Error Cepat (Error -> Akar Masalah -> Perbaikan)
@@ -352,7 +352,7 @@ Solusi:
 | `unknown command 'XGROUP'` | Redis lama, tidak support Streams | Upgrade Redis modern (disarankan), sistem akan fallback ke legacy queue mode |
 | `Process from config.webServer ... Exit code: 3` | Web server Playwright gagal start | Lihat log webServer, biasanya dependency/port issue |
 | `missing required package @types/node` | Dependency TypeScript belum terpasang di UI | `cd ui && npm i -D @types/node` lalu rerun E2E |
-| `EADDRINUSE: address already in use` | Port sudah dipakai proses lain | Stop proses lama (`3000/5174/8000`), lalu start ulang service |
+| `EADDRINUSE: address already in use` | Port sudah dipakai proses lain | Stop proses lama (`3000/5178/8000`), lalu start ulang service |
 | Run status banyak `queued` tapi tidak diproses | Worker tidak jalan, crash, atau tidak konsumsi queue | Cek `runtime-logs/worker.err.log`, cek process worker, cek Redis koneksi |
 | Worker log `No handler found for job type: ...` | Tipe job tidak terdaftar di handler registry | Perbaiki `type` pada spec job atau daftarkan handler job tersebut |
 | `npm audit` ada `high/critical` | Dependency rentan keamanan | Upgrade package terdampak (misal `next`) hingga audit bersih |
@@ -417,7 +417,7 @@ Interpretasi:
 | `GET /queue` depth | `0-20` stabil | `20-100` naik pelan | `>100` naik terus | Naikkan `WORKER_CONCURRENCY`, cek worker hidup, cek run stuck |
 | `GET /runs` failed ratio | `<1%` | `1-5%` | `>5%` | Cek error dominan per job type, cek retry policy/cooldown |
 | `GET /events` | Event periodik normal | Banyak `dispatch_skipped_*` | Spam error tanpa `run.completed` | Cek guard scheduler, cek bottleneck worker |
-| UI dashboard | Semua halaman kebuka | Ada halaman lambat | Tidak bisa load / blank | Cek `ui` process, port 3000/5174, `ui.err.log` |
+| UI dashboard | Semua halaman kebuka | Ada halaman lambat | Tidak bisa load / blank | Cek `ui` process, port 3000/5178, `ui.err.log` |
 
 Penjelasan:
 1. `Warning` bukan langsung down, tapi tanda awal perlu tuning.

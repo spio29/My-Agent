@@ -1,16 +1,6 @@
 import { toast } from "sonner";
 
-const normalizePathPrefix = (value: string | undefined): string => {
-  const trimmed = String(value || "").trim();
-  if (!trimmed || trimmed === "/") {
-    return "";
-  }
-
-  return `/${trimmed.replace(/^\/+|\/+$/g, "")}`;
-};
-
-const APP_BASE_PATH = normalizePathPrefix(process.env.NEXT_PUBLIC_BASE_PATH);
-const DEFAULT_API_BASE = `${APP_BASE_PATH || ""}/api`;
+const DEFAULT_API_BASE = "/api";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || DEFAULT_API_BASE;
 const API_AUTH_STORAGE_KEY = "spio_api_token";
 const API_AUTH_HEADER = process.env.NEXT_PUBLIC_API_AUTH_HEADER || "Authorization";
