@@ -4,25 +4,25 @@
 
 :root {
   color-scheme: light;
-  --background: 210 100% 97%;
-  --foreground: 222 47% 11%;
+  --background: 42 18% 95%;
+  --foreground: 220 18% 18%;
   --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
+  --card-foreground: 220 18% 18%;
   --popover: 0 0% 100%;
-  --popover-foreground: 222 47% 11%;
-  --primary: 207 88% 62%;
+  --popover-foreground: 220 18% 18%;
+  --primary: 220 20% 22%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 210 100% 96%;
-  --secondary-foreground: 222 47% 11%;
-  --muted: 210 100% 96%;
-  --muted-foreground: 221 65% 24%;
-  --accent: 203 100% 95%;
-  --accent-foreground: 203 85% 35%;
-  --destructive: 0 84% 60%;
+  --secondary: 36 20% 91%;
+  --secondary-foreground: 220 18% 18%;
+  --muted: 36 14% 92%;
+  --muted-foreground: 220 10% 38%;
+  --accent: 145 26% 90%;
+  --accent-foreground: 145 30% 24%;
+  --destructive: 0 71% 52%;
   --destructive-foreground: 0 0% 100%;
-  --border: 0 0% 100%;
-  --input: 216 34% 92%;
-  --ring: 207 88% 62%;
+  --border: 220 10% 86%;
+  --input: 220 10% 86%;
+  --ring: 220 18% 18%;
 }
 
 * {
@@ -31,20 +31,18 @@
 
 html,
 body {
-  height: 100%;
+  min-height: 100%;
   width: 100%;
-  overflow: hidden;
 }
 
 body {
   margin: 0;
-  font-family: var(--font-body), "Plus Jakarta Sans", "DM Sans", "Segoe UI", sans-serif;
-  line-height: 1.54;
+  font-family: "IBM Plex Sans", "Source Sans 3", "Helvetica Neue", sans-serif;
+  line-height: 1.5;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-feature-settings: "kern" 1, "liga" 1;
-  background: transparent;
+  background: hsl(var(--background));
   color: hsl(var(--foreground));
 }
 
@@ -55,17 +53,18 @@ select {
   font: inherit;
 }
 
+h1,
 h2,
 h3,
 h4,
 h5,
 h6,
 .ui-heading {
-  font-family: var(--font-heading), "Sora", "Montserrat", "Segoe UI", sans-serif;
-  letter-spacing: 0.012em;
-  line-height: 1.25;
-  font-weight: 700;
-  color: rgb(15 23 42);
+  font-family: "IBM Plex Sans", "Source Sans 3", "Helvetica Neue", sans-serif;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  font-weight: 600;
+  color: hsl(var(--foreground));
 }
 
 a {
@@ -74,13 +73,99 @@ a {
 }
 
 ::selection {
-  background: hsl(var(--accent));
+  background: rgba(112, 150, 126, 0.24);
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  background: hsl(var(--background));
+}
+
+.app-mobile-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-bottom: 1px solid hsl(var(--border));
+  background: rgba(255, 255, 255, 0.88);
+  padding: 16px 20px 14px;
+}
+
+.app-sidebar {
+  display: none;
+  width: 252px;
+  flex-shrink: 0;
+  border-right: 1px solid hsl(var(--border));
+  background: rgba(255, 255, 255, 0.88);
+  padding: 24px 16px 16px;
+}
+
+.app-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 20px;
+  padding: 0 8px;
+}
+
+.app-mobile-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 4px;
+}
+
+.app-brand__name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.app-brand__meta {
+  font-size: 0.8rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.app-main {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid hsl(var(--border));
+  padding: 24px 24px 16px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.app-title {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.app-subtitle {
+  margin: 6px 0 0;
+  font-size: 0.92rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.app-content {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
 }
 
 @keyframes ux-fade-in {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -89,8 +174,9 @@ a {
 @keyframes ux-rise-in {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(4px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -99,60 +185,63 @@ a {
 
 @layer utilities {
   .glass-island {
-    @apply rounded-3xl border border-white bg-white/70 shadow-xl shadow-blue-900/5 backdrop-blur-xl ring-1 ring-[#42A5F5]/20;
+    @apply rounded-xl border bg-white shadow-sm;
+    border-color: hsl(var(--border));
+  }
+
+  .font-signature,
+  .font-montserrat,
+  .font-body-copy {
+    font-family: "IBM Plex Sans", "Source Sans 3", "Helvetica Neue", sans-serif;
   }
 
   .font-signature {
-    font-family: var(--font-signature), "Caveat", "Segoe Script", cursive;
-    font-weight: 700;
-    letter-spacing: 0.01em;
-    line-height: 0.95;
-  }
-
-  .font-montserrat {
-    font-family: var(--font-heading), "Sora", "Montserrat", "Segoe UI", sans-serif;
-  }
-
-  .font-body-copy {
-    font-family: var(--font-body), "Plus Jakarta Sans", "DM Sans", "Segoe UI", sans-serif;
-    letter-spacing: 0.003em;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
   }
 
   .metric-label {
-    @apply text-[11px] font-medium uppercase tracking-[0.1em] text-blue-900/60 font-body-copy;
+    @apply text-[11px] font-medium uppercase tracking-[0.08em];
+    color: hsl(var(--muted-foreground));
   }
 
   .metric-card-hover {
-    @apply transition-transform duration-200 hover:-translate-y-1;
+    transition: box-shadow 160ms ease, border-color 160ms ease;
+  }
+
+  .metric-card-hover:hover {
+    border-color: rgba(91, 99, 120, 0.3);
+    box-shadow: 0 8px 24px rgba(18, 25, 38, 0.06);
   }
 
   .ux-fade-in {
-    animation: ux-fade-in 220ms ease-out both;
+    animation: ux-fade-in 180ms ease-out both;
   }
 
   .ux-fade-in-delayed {
-    animation: ux-fade-in 300ms ease-out both;
-    animation-delay: 70ms;
+    animation: ux-fade-in 240ms ease-out both;
+    animation-delay: 40ms;
   }
 
   .ux-rise-in {
-    animation: ux-rise-in 260ms cubic-bezier(0.2, 0.75, 0.3, 1) both;
+    animation: ux-rise-in 220ms ease-out both;
   }
 
   .ux-surface {
-    transition: transform 180ms ease, box-shadow 180ms ease;
+    transition: box-shadow 160ms ease, border-color 160ms ease;
   }
 
   .ux-surface:hover {
-    box-shadow: 0 18px 32px -26px rgba(66, 165, 245, 0.4);
+    box-shadow: 0 8px 24px rgba(18, 25, 38, 0.06);
   }
 
   .metric-number {
-    font-family: var(--font-body), "Plus Jakarta Sans", "DM Sans", "Segoe UI", sans-serif;
+    font-family: "IBM Plex Sans", "Source Sans 3", "Helvetica Neue", sans-serif;
     font-variant-numeric: tabular-nums;
-    font-weight: 500;
-    letter-spacing: 0.004em;
-    color: rgb(15 23 42);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: hsl(var(--foreground));
   }
 
   .no-scrollbar {
@@ -162,6 +251,27 @@ a {
 
   .no-scrollbar::-webkit-scrollbar {
     display: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .app-mobile-shell {
+    display: none;
+  }
+
+  .app-sidebar {
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 1023px) {
+  .app-header {
+    padding: 20px 20px 14px;
+  }
+
+  .app-content {
+    padding: 20px;
   }
 }
 

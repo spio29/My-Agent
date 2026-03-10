@@ -1519,9 +1519,9 @@ export default function ChairmanDashboard() {
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-lg font-semibold text-slate-900 font-montserrat">
               <Bot className="h-5 w-5 text-slate-700" />
-              Boardroom
+              Operator Feed
             </CardTitle>
-            <p className="text-[11px] text-blue-900/60 font-body-copy">Live chat.</p>
+            <p className="text-[11px] text-blue-900/60 font-body-copy">Aktivitas operator.</p>
           </CardHeader>
 
           <CardContent className="no-scrollbar flex-1 space-y-3 overflow-y-auto p-4 pt-0">
@@ -1539,7 +1539,7 @@ export default function ChairmanDashboard() {
                 >
                   <p className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-900/60 font-montserrat">
                     {msg.sender === "Chairman" ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
-                    {msg.sender}
+                    {msg.sender === "Chairman" ? "Operator" : msg.sender}
                   </p>
                   <div
                     className={`mb-2 h-px ${
@@ -1566,7 +1566,7 @@ export default function ChairmanDashboard() {
                 <textarea
                   ref={composerRef}
                   rows={1}
-                  placeholder="Ketik mandat..."
+                  placeholder="Ketik catatan operator..."
                   value={mandateText}
                   onChange={(e) => setMandateText(e.target.value)}
                   onKeyDown={handleComposerKeyDown}
@@ -1602,7 +1602,7 @@ export default function ChairmanDashboard() {
             5s
           </span>
         </div>
-        <div>SPIO</div>
+        <div>Portfolio Ops</div>
       </footer>
     </div>
   );

@@ -2,34 +2,57 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Brain, Gauge, Settings2, ShieldCheck, Sword } from "lucide-react";
+import {
+  AlertTriangle,
+  LayoutDashboard,
+  PlaySquare,
+  Settings2,
+  UsersRound,
+  Workflow,
+} from "lucide-react";
+
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/", label: "Home", icon: Gauge },
-  { href: "/memory", label: "Memory", icon: Brain },
-  { href: "/armory", label: "Armory", icon: Sword },
-  { href: "/automation", label: "Automation", icon: ShieldCheck },
-  { href: "/settings", label: "Settings", icon: Settings2 },
+  { href: "/", label: "Overview", icon: LayoutDashboard, available: true },
+  { href: "/influencers", label: "Influencers", icon: UsersRound, available: false },
+  { href: "/workflows", label: "Workflows", icon: Workflow, available: false },
+  { href: "/runs", label: "Runs", icon: PlaySquare, available: true },
+  { href: "/incidents", label: "Incidents", icon: AlertTriangle, available: false },
+  { href: "/settings", label: "Settings", icon: Settings2, available: true },
 ];
 
-export default function SidebarNav({ compact = false }) {
+export default function SidebarNav() {
   const pathname = usePathname();
 
-  const getLinkClass = (href) =>
-    cn(
-      "flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-sm font-bold tracking-tight transition-colors",
-      pathname === href
-        ? "border-[#42A5F5]/40 bg-[#42A5F5]/20 text-[#1F5D93]"
-        : "border-transparent text-blue-900/60 hover:border-white hover:bg-white/70 hover:text-slate-900",
-    );
-
   return (
-    <nav className={compact ? "mt-4 grid grid-cols-2 gap-2" : "flex-1 space-y-1.5 p-4"}>
+    <nav
+      aria-label="Primary"
+      className="no-scrollbar flex flex-nowrap gap-2 overflow-x-auto pb-1 lg:flex-col lg:gap-1.5 lg:overflow-visible lg:pb-0"
+    >
       {navItems.map((item) => {
         const Icon = item.icon;
+        const isActive = pathname === item.href;
+        const itemClassName = cn(
+          "flex shrink-0 items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+          isActive
+            ? "bg-slate-900 text-white"
+            : item.available
+              ? "text-slate-700 hover:bg-white hover:text-slate-950"
+              : "text-slate-400",
+        );
+
+        if (!item.available) {
+          return (
+            <span key={item.href} aria-disabled="true" className={itemClassName}>
+              <Icon className="h-4 w-4" />
+              <span>{item.label}</span>
+            </span>
+          );
+        }
+
         return (
-          <Link key={item.href} href={item.href} className={getLinkClass(item.href)}>
+          <Link key={item.href} href={item.href} className={itemClassName}>
             <Icon className="h-4 w-4" />
             <span>{item.label}</span>
           </Link>
