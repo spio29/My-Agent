@@ -114,101 +114,6 @@ export interface TelegramConnectorAccountUpsertRequest {
   inbound_followup_template?: string;
 }
 
-export interface McpIntegrationServer {
-  server_id: string;
-  enabled: boolean;
-  transport: "stdio" | "http" | "sse";
-  description: string;
-  command: string;
-  args: string[];
-  url: string;
-  headers: Record<string, string>;
-  env: Record<string, string>;
-  has_auth_token: boolean;
-  auth_token_masked?: string;
-  timeout_sec: number;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface McpIntegrationServerUpsertRequest {
-  enabled: boolean;
-  transport: "stdio" | "http" | "sse";
-  description: string;
-  command: string;
-  args: string[];
-  url: string;
-  headers: Record<string, string>;
-  env: Record<string, string>;
-  auth_token?: string;
-  timeout_sec: number;
-}
-
-export interface IntegrationAccount {
-  provider: string;
-  account_id: string;
-  enabled: boolean;
-  has_secret: boolean;
-  secret_masked?: string;
-  config: Record<string, unknown>;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface IntegrationAccountUpsertRequest {
-  enabled: boolean;
-  secret?: string;
-  config: Record<string, unknown>;
-}
-
-export interface IntegrationProviderTemplate {
-  provider: string;
-  label: string;
-  description: string;
-  auth_hint: string;
-  default_account_id: string;
-  default_enabled: boolean;
-  default_config: Record<string, unknown>;
-}
-
-export interface McpServerTemplate {
-  template_id: string;
-  server_id: string;
-  label: string;
-  description: string;
-  transport: "stdio" | "http" | "sse";
-  command: string;
-  args: string[];
-  url: string;
-  headers: Record<string, string>;
-  env: Record<string, string>;
-  timeout_sec: number;
-  default_enabled: boolean;
-}
-
-export interface IntegrationsCatalog {
-  providers: IntegrationProviderTemplate[];
-  mcp_servers: McpServerTemplate[];
-}
-
-export interface IntegrationsBootstrapRequest {
-  provider_ids?: string[];
-  mcp_template_ids?: string[];
-  account_id?: string;
-  overwrite?: boolean;
-}
-
-export interface IntegrationsBootstrapResponse {
-  account_id: string;
-  overwrite: boolean;
-  providers_created: string[];
-  providers_updated: string[];
-  providers_skipped: string[];
-  mcp_created: string[];
-  mcp_updated: string[];
-  mcp_skipped: string[];
-}
-
 export interface Agent {
   id: string;
   type?: string;
@@ -444,50 +349,6 @@ export interface TriggerFireResponse {
   run_id: string;
   channel: string;
   source: string;
-}
-
-export interface RateLimitConfig {
-  max_runs: number;
-  window_sec: number;
-}
-
-export interface Skill {
-  skill_id: string;
-  name: string;
-  description: string;
-  job_type: string;
-  version: string;
-  runbook: string;
-  source: string;
-  default_inputs: Record<string, unknown>;
-  command_allow_prefixes: string[];
-  allowed_channels: string[];
-  tags: string[];
-  tool_allowlist?: string[];
-  required_secrets?: string[];
-  rate_limit?: RateLimitConfig;
-  allow_sensitive_commands: boolean;
-  require_approval: boolean;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface SkillSpecRequest {
-  name: string;
-  description?: string;
-  job_type: string;
-  version?: string;
-  runbook?: string;
-  source?: string;
-  default_inputs?: Record<string, unknown>;
-  command_allow_prefixes?: string[];
-  allowed_channels?: string[];
-  tags?: string[];
-  tool_allowlist?: string[];
-  required_secrets?: string[];
-  rate_limit?: RateLimitConfig;
-  allow_sensitive_commands?: boolean;
-  require_approval?: boolean;
 }
 
 const handleApiError = <T>(error: unknown, message: string, fallback: T): T => {
@@ -890,44 +751,6 @@ export const fireTriggerVoice = async (
   return await parseTriggerResponse(response);
 };
 
-export const getSkills = async (tags?: string[]): Promise<Skill[]> => {
-  try {
-    const queryParams = new URLSearchParams();
-    if (tags?.length) {
-      queryParams.append("tags", tags.join(","));
-    }
-    const path = `/skills${queryParams.size ? `?${queryParams.toString()}` : ""}`;
-    return await getJson<Skill[]>(path);
-  } catch (error) {
-    return handleApiError(error, "Gagal memuat skill", []);
-  }
-};
-
-export const upsertSkill = async (skillId: string, payload: SkillSpecRequest): Promise<Skill | undefined> => {
-  try {
-    return await send<Skill>(`/skills/${encodeURIComponent(skillId)}`, "PUT", payload);
-  } catch (error) {
-    return handleApiError(error, `Gagal menyimpan skill ${skillId}`, undefined);
-  }
-};
-
-export const deleteSkill = async (skillId: string): Promise<boolean> => {
-  try {
-    await send(`/skills/${encodeURIComponent(skillId)}`, "DELETE");
-    return true;
-  } catch (error) {
-    return handleApiError(error, `Gagal menghapus skill ${skillId}`, false);
-  }
-};
-
-export const syncSkills = async (skills: SkillSpecRequest[]): Promise<Skill[] | undefined> => {
-  try {
-    return await send<Skill[]>("/skills/sync", "POST", { skills });
-  } catch (error) {
-    return handleApiError(error, "Gagal sinkron skill", undefined);
-  }
-};
-
 export const getTelegramConnectorAccounts = async (): Promise<TelegramConnectorAccount[]> => {
   try {
     return await getJson<TelegramConnectorAccount[]>("/connector/telegram/accounts");
@@ -953,85 +776,6 @@ export const deleteTelegramConnectorAccount = async (accountId: string): Promise
     return true;
   } catch (error) {
     return handleApiError(error, "Gagal menghapus akun Telegram", false);
-  }
-};
-
-export const getMcpIntegrationServers = async (): Promise<McpIntegrationServer[]> => {
-  try {
-    return await getJson<McpIntegrationServer[]>("/integrations/mcp/servers");
-  } catch (error) {
-    return handleApiError(error, "Gagal memuat daftar MCP server", []);
-  }
-};
-
-export const upsertMcpIntegrationServer = async (
-  serverId: string,
-  payload: McpIntegrationServerUpsertRequest,
-): Promise<McpIntegrationServer | undefined> => {
-  try {
-    return await send<McpIntegrationServer>(`/integrations/mcp/servers/${serverId}`, "PUT", payload);
-  } catch (error) {
-    return handleApiError(error, "Gagal menyimpan MCP server", undefined);
-  }
-};
-
-export const deleteMcpIntegrationServer = async (serverId: string): Promise<boolean> => {
-  try {
-    await send<{ server_id: string; status: string }>(`/integrations/mcp/servers/${serverId}`, "DELETE");
-    return true;
-  } catch (error) {
-    return handleApiError(error, "Gagal menghapus MCP server", false);
-  }
-};
-
-export const getIntegrationAccounts = async (provider?: string): Promise<IntegrationAccount[]> => {
-  try {
-    const query = provider ? `?provider=${encodeURIComponent(provider)}` : "";
-    return await getJson<IntegrationAccount[]>(`/integrations/accounts${query}`);
-  } catch (error) {
-    return handleApiError(error, "Gagal memuat akun integrasi", []);
-  }
-};
-
-export const upsertIntegrationAccount = async (
-  provider: string,
-  accountId: string,
-  payload: IntegrationAccountUpsertRequest,
-): Promise<IntegrationAccount | undefined> => {
-  try {
-    return await send<IntegrationAccount>(`/integrations/accounts/${provider}/${accountId}`, "PUT", payload);
-  } catch (error) {
-    return handleApiError(error, "Gagal menyimpan akun integrasi", undefined);
-  }
-};
-
-export const deleteIntegrationAccount = async (provider: string, accountId: string): Promise<boolean> => {
-  try {
-    await send<{ provider: string; account_id: string; status: string }>(
-      `/integrations/accounts/${provider}/${accountId}`,
-      "DELETE",
-    );
-    return true;
-  } catch (error) {
-    return handleApiError(error, "Gagal menghapus akun integrasi", false);
-  }
-};
-
-export const getIntegrationsCatalog = async (): Promise<IntegrationsCatalog> => {
-  try {
-    return await getJson<IntegrationsCatalog>("/integrations/catalog");
-  } catch (error) {
-    return handleApiError(error, "Gagal memuat katalog konektor", { providers: [], mcp_servers: [] });
-  }
-};
-
-export const bootstrapIntegrationsCatalog = async (
-  payload: IntegrationsBootstrapRequest,
-): Promise<IntegrationsBootstrapResponse | undefined> => {
-  try {
-    return await send<IntegrationsBootstrapResponse>("/integrations/catalog/bootstrap", "POST", payload);
-  } catch (error) {
-    return handleApiError(error, "Gagal menambahkan template konektor", undefined);
   }
 };
 
@@ -1116,7 +860,7 @@ export const getEvents = async (params?: {
     const path = `/events${queryParams.size ? `?${queryParams.toString()}` : ""}`;
     return await getJson<SystemEvent[]>(path);
   } catch (error) {
-    return handleApiError(error, "Gagal memuat update skill", []);
+    return handleApiError(error, "Gagal memuat sinyal sistem", []);
   }
 };
 

@@ -64,4 +64,6 @@ test("incidents and settings support operator follow-up", async ({ page }) => {
   await page.goto("/settings");
   await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Configuration", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Delivery lanes", exact: true })).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(/MCP|Template catalog|Integration inventory|provider template/i);
 });

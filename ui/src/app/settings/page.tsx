@@ -11,20 +11,25 @@ import {
   clearApiAuthToken,
   getApiAuthToken,
   getEvents,
-  getIntegrationAccounts,
-  getIntegrationsCatalog,
-  getMcpIntegrationServers,
   getSystemMetrics,
   getTelegramConnectorAccounts,
   setApiAuthToken,
 } from "@/lib/api";
 
-const summarizeEvent = (type: string): string =>
-  type
+const summarizeEvent = (type: string): string => {
+  const normalized = type.toLowerCase();
+
+  if (normalized.includes("telegram")) return "Notification lane updated";
+  if (normalized.includes("auth") || normalized.includes("token")) return "Access updated";
+  if (normalized.includes("approval")) return "Approval flow updated";
+  if (normalized.includes("settings") || normalized.includes("config")) return "Workspace setting updated";
+
+  return type
     .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ")
     .trim()
     .replace(/\b\w/g, (char) => char.toUpperCase());
+};
 
 const formatTimestamp = (value?: string): string => {
   if (!value) return "Belum ada";
@@ -51,18 +56,6 @@ export default function SettingsPage() {
     queryKey: ["settings", "telegram"],
     queryFn: () => getTelegramConnectorAccounts(),
   });
-  const integrationsQuery = useQuery({
-    queryKey: ["settings", "integrations"],
-    queryFn: () => getIntegrationAccounts(),
-  });
-  const mcpQuery = useQuery({
-    queryKey: ["settings", "mcp"],
-    queryFn: () => getMcpIntegrationServers(),
-  });
-  const catalogQuery = useQuery({
-    queryKey: ["settings", "catalog"],
-    queryFn: () => getIntegrationsCatalog(),
-  });
   const eventsQuery = useQuery({
     queryKey: ["settings", "events"],
     queryFn: () => getEvents({ limit: 8 }),
@@ -72,30 +65,42 @@ export default function SettingsPage() {
     await Promise.all([
       metricsQuery.refetch(),
       telegramQuery.refetch(),
-      integrationsQuery.refetch(),
-      mcpQuery.refetch(),
-      catalogQuery.refetch(),
       eventsQuery.refetch(),
     ]);
   };
 
-  const enabledIntegrations = useMemo(
-    () => (integrationsQuery.data || []).filter((item) => item.enabled),
-    [integrationsQuery.data],
-  );
-  const enabledMcpServers = useMemo(
-    () => (mcpQuery.data || []).filter((item) => item.enabled),
-    [mcpQuery.data],
-  );
-  const readyTelegramAccounts = useMemo(
-    () =>
-      (telegramQuery.data || []).filter((item) => item.enabled && item.has_bot_token),
+  const enabledTelegramAccounts = useMemo(
+    () => (telegramQuery.data || []).filter((item) => item.enabled),
     [telegramQuery.data],
   );
+  const readyTelegramAccounts = useMemo(
+    () => enabledTelegramAccounts.filter((item) => item.has_bot_token),
+    [enabledTelegramAccounts],
+  );
+  const activeChatTargets = useMemo(() => {
+    const uniqueTargets = new Set<string>();
+
+    for (const account of enabledTelegramAccounts) {
+      for (const chatId of account.allowed_chat_ids || []) {
+        if (chatId) uniqueTargets.add(chatId);
+      }
+    }
+
+    return uniqueTargets;
+  }, [enabledTelegramAccounts]);
+  const defaultChannels = useMemo(() => {
+    const uniqueChannels = new Set<string>();
+
+    for (const account of enabledTelegramAccounts) {
+      if (account.default_channel) uniqueChannels.add(account.default_channel);
+    }
+
+    return uniqueChannels;
+  }, [enabledTelegramAccounts]);
   const configurationEvents = useMemo(
     () =>
       (eventsQuery.data || []).filter((event) =>
-        /integration|connector|approval|automation/.test(event.type),
+        /telegram|auth|token|settings|config|approval/.test(event.type),
       ),
     [eventsQuery.data],
   );
@@ -127,14 +132,14 @@ export default function SettingsPage() {
       <div className="max-w-3xl">
         <h2 className="text-3xl font-semibold tracking-[-0.03em] text-slate-950">Settings</h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          Configuration workspace for operator access, system readiness, and
-          integration inventory without reopening the previous setup surface.
+          Configuration workspace for operator access, runtime health, and
+          delivery lanes.
         </p>
       </div>
 
       <SectionShell
         title="Configuration"
-        description="Store the operator API token locally and confirm the preview app is pointing at the expected upstream."
+        description="Store the operator API token locally and confirm the workspace is using the expected upstream."
         actions={
           <button
             type="button"
@@ -145,12 +150,7 @@ export default function SettingsPage() {
           >
             <RefreshCw
               className={`h-4 w-4 ${
-                metricsQuery.isFetching ||
-                telegramQuery.isFetching ||
-                integrationsQuery.isFetching ||
-                mcpQuery.isFetching ||
-                catalogQuery.isFetching ||
-                eventsQuery.isFetching
+                metricsQuery.isFetching || telegramQuery.isFetching || eventsQuery.isFetching
                   ? "animate-spin"
                   : ""
               }`}
@@ -207,10 +207,9 @@ export default function SettingsPage() {
               </p>
             </article>
             <article className="rounded-lg border border-slate-200 bg-stone-50 px-4 py-3 sm:col-span-2">
-              <p className="text-sm text-slate-500">Template catalog</p>
+              <p className="text-sm text-slate-500">Workspace target</p>
               <p className="mt-1 text-sm font-medium text-slate-900">
-                {catalogQuery.data?.providers.length || 0} provider template ·{" "}
-                {catalogQuery.data?.mcp_servers.length || 0} MCP template
+                amazing.spio.digital routed through the operator workspace on `/api`.
               </p>
             </article>
           </div>
@@ -262,62 +261,48 @@ export default function SettingsPage() {
         </SectionShell>
 
         <SectionShell
-          title="Integration inventory"
-          description="Current counts for operator-facing connectors, providers, and MCP servers."
+          title="Delivery lanes"
+          description="Counts for operator-facing notification lanes and their current routing targets."
         >
           <div className="grid gap-3 sm:grid-cols-3">
             <article className="rounded-lg border border-slate-200 bg-stone-50 px-4 py-3">
-              <p className="text-sm text-slate-500">Provider accounts</p>
-              <p className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
-                {enabledIntegrations.length}
-              </p>
-            </article>
-            <article className="rounded-lg border border-slate-200 bg-stone-50 px-4 py-3">
-              <p className="text-sm text-slate-500">MCP servers</p>
-              <p className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
-                {enabledMcpServers.length}
-              </p>
-            </article>
-            <article className="rounded-lg border border-slate-200 bg-stone-50 px-4 py-3">
-              <p className="text-sm text-slate-500">Telegram lanes</p>
+              <p className="text-sm text-slate-500">Ready lanes</p>
               <p className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
                 {readyTelegramAccounts.length}
               </p>
             </article>
+            <article className="rounded-lg border border-slate-200 bg-stone-50 px-4 py-3">
+              <p className="text-sm text-slate-500">Enabled lanes</p>
+              <p className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                {enabledTelegramAccounts.length}
+              </p>
+            </article>
+            <article className="rounded-lg border border-slate-200 bg-stone-50 px-4 py-3">
+              <p className="text-sm text-slate-500">Chat targets</p>
+              <p className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                {activeChatTargets.size}
+              </p>
+            </article>
           </div>
 
-          <div className="mt-4 grid gap-3 lg:grid-cols-3">
+          <div className="mt-4 grid gap-3 lg:grid-cols-2">
             <article className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-              <p className="text-sm text-slate-500">Providers</p>
-              <p className="mt-2 text-sm leading-6 text-slate-700">
-                {enabledIntegrations.length > 0
-                  ? enabledIntegrations
-                      .slice(0, 5)
-                      .map((item) => `${item.provider}/${item.account_id}`)
-                      .join(", ")
-                  : "Belum ada akun provider aktif."}
-              </p>
-            </article>
-            <article className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-              <p className="text-sm text-slate-500">MCP servers</p>
-              <p className="mt-2 text-sm leading-6 text-slate-700">
-                {enabledMcpServers.length > 0
-                  ? enabledMcpServers
-                      .slice(0, 5)
-                      .map((item) => item.server_id)
-                      .join(", ")
-                  : "Belum ada MCP server aktif."}
-              </p>
-            </article>
-            <article className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-              <p className="text-sm text-slate-500">Telegram</p>
+              <p className="text-sm text-slate-500">Ready accounts</p>
               <p className="mt-2 text-sm leading-6 text-slate-700">
                 {readyTelegramAccounts.length > 0
                   ? readyTelegramAccounts
                       .slice(0, 5)
                       .map((item) => item.account_id)
                       .join(", ")
-                  : "Belum ada akun Telegram siap pakai."}
+                  : "Belum ada lane siap pakai."}
+              </p>
+            </article>
+            <article className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+              <p className="text-sm text-slate-500">Default channels</p>
+              <p className="mt-2 text-sm leading-6 text-slate-700">
+                {defaultChannels.size > 0
+                  ? Array.from(defaultChannels).slice(0, 5).join(", ")
+                  : "Belum ada channel default yang dikonfigurasi."}
               </p>
             </article>
           </div>
@@ -326,7 +311,7 @@ export default function SettingsPage() {
 
       <SectionShell
         title="Recent setup signals"
-        description="Recent configuration-oriented events that help explain the current workspace state."
+        description="Recent access and notification events that help explain the current workspace state."
       >
         <div className="divide-y divide-slate-200">
           {configurationEvents.length === 0 ? (
