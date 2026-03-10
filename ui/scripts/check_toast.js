@@ -17,7 +17,7 @@ const { chromium } = require("playwright");
     if (msg.type() === "error") consoleErrors.push(msg.text());
   });
 
-  await page.goto("http://213.163.193.6:3001/prompt", {
+  await page.goto("http://213.163.193.6:3001/settings", {
     waitUntil: "domcontentloaded",
     timeout: 60000,
   });

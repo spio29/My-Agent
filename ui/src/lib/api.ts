@@ -75,6 +75,8 @@ export interface Run {
   trace_id?: string;
 }
 
+export type RunStatus = Run["status"];
+
 export interface Connector {
   channel: string;
   account_id: string;
@@ -376,6 +378,8 @@ export interface ApprovalRequest {
   decision_by?: string;
   decision_note?: string;
 }
+
+export type ApprovalStatus = ApprovalRequest["status"];
 
 export interface Experiment {
   experiment_id: string;
@@ -692,7 +696,7 @@ export const triggerJob = async (jobId: string): Promise<boolean> => {
 export const getRuns = async (params?: {
   job_id?: string;
   limit?: number;
-  status?: string;
+  status?: RunStatus;
   search?: string;
   offset?: number;
 }): Promise<Run[]> => {
@@ -1150,7 +1154,7 @@ export const getAuditLogs = async (params?: {
 };
 
 export const getApprovalRequests = async (params?: {
-  status?: "pending" | "approved" | "rejected";
+  status?: ApprovalStatus;
   limit?: number;
 }): Promise<ApprovalRequest[]> => {
   try {

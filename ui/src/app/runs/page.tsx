@@ -7,7 +7,7 @@ import { RefreshCw, Search } from "lucide-react";
 import FilterBar from "@/components/operator/filter-bar";
 import SectionShell from "@/components/operator/section-shell";
 import StatusPill from "@/components/operator/status-pill";
-import { getRuns } from "@/lib/api";
+import { getRuns, type RunStatus } from "@/lib/api";
 import { adaptRunRows, summarizeRunStates } from "@/lib/workflows";
 
 const runFilterItems = (counts: ReturnType<typeof summarizeRunStates>) => [
@@ -20,7 +20,7 @@ const runFilterItems = (counts: ReturnType<typeof summarizeRunStates>) => [
 
 export default function RunsPage() {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | RunStatus>("all");
   const [selectedRunId, setSelectedRunId] = useState("");
   const deferredSearch = useDeferredValue(search);
 
@@ -97,7 +97,7 @@ export default function RunsPage() {
             <FilterBar
               items={runFilterItems(runCounts)}
               value={statusFilter}
-              onChange={setStatusFilter}
+              onChange={(value) => setStatusFilter(value as "all" | RunStatus)}
             />
           </div>
 

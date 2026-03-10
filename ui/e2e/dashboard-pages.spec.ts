@@ -55,3 +55,13 @@ test("workflows and runs pages support operator inspection", async ({ page }) =>
   await expect(page.getByRole("heading", { name: "Runs", exact: true })).toBeVisible();
   await expect(page.getByPlaceholder("Search runs")).toBeVisible();
 });
+
+test("incidents and settings support operator follow-up", async ({ page }) => {
+  await page.goto("/incidents");
+  await expect(page.getByRole("heading", { name: "Incidents", exact: true })).toBeVisible();
+  await expect(page.getByText("Recovery", { exact: true })).toBeVisible();
+
+  await page.goto("/settings");
+  await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Configuration", exact: true })).toBeVisible();
+});
