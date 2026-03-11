@@ -51,11 +51,15 @@ _fallback_failure_state: Dict[str, Dict[str, Any]] = {}
 _fallback_events: List[Dict[str, Any]] = []
 _mode_fallback_redis = False
 _mode_legacy_redis_queue = False
+_last_redis_recovery_attempt_monotonic = 0.0
+_REDIS_RECOVERY_RETRY_SEC = 1.0
 
 
 def set_mode_fallback_redis(enabled: bool) -> None:
-    global _mode_fallback_redis
+    global _mode_fallback_redis, _last_redis_recovery_attempt_monotonic
     _mode_fallback_redis = bool(enabled)
+    if not _mode_fallback_redis:
+        _last_redis_recovery_attempt_monotonic = 0.0
 
 
 def set_mode_legacy_redis_queue(enabled: bool) -> None:
@@ -264,6 +268,34 @@ async def init_queue():
         _aktifkan_mode_fallback()
         # Fallback mode: no setup required.
         return
+
+
+async def try_recover_redis(force: bool = False) -> bool:
+    global _last_redis_recovery_attempt_monotonic
+
+    if not (_sedang_mode_fallback_redis() or is_mode_legacy_redis_queue()):
+        return True
+
+    sekarang = time.monotonic()
+    if not force and (sekarang - _last_redis_recovery_attempt_monotonic) < _REDIS_RECOVERY_RETRY_SEC:
+        return False
+    _last_redis_recovery_attempt_monotonic = sekarang
+
+    try:
+        await redis_client.ping()
+    except (RedisError, RedisTimeoutError, OSError):
+        return False
+    except Exception:
+        return False
+
+    set_mode_fallback_redis(False)
+    set_mode_legacy_redis_queue(False)
+    try:
+        await init_queue()
+    except Exception:
+        _aktifkan_mode_fallback()
+        return False
+    return not _sedang_mode_fallback_redis()
 
 
 async def enqueue_job(event: Union[QueueEvent, Dict[str, Any]]) -> str:

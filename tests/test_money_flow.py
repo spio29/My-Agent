@@ -1,7 +1,6 @@
 import uuid
 
 import pytest
-import redis.asyncio as redis_async
 
 import app.core.armory as armory_mod
 import app.core.branches as branches_mod
@@ -9,8 +8,8 @@ import app.core.redis_client as redis_client_mod
 import app.core.boardroom as boardroom_mod
 from app.core.armory import add_account, update_account_status
 from app.core.branches import create_branch, get_branch, upsert_blueprint
-from app.core.config import settings
 from app.core.models import AccountStatus
+from tests.fake_async_redis import FakeAsyncRedis
 
 
 class _Ctx:
@@ -27,17 +26,7 @@ def anyio_backend():
 
 @pytest.fixture(autouse=True)
 async def _reset_redis_client_per_test():
-    fresh_client = redis_async.Redis(
-        host=settings.REDIS_HOST,
-        port=settings.REDIS_PORT,
-        db=settings.REDIS_DB,
-        password=settings.REDIS_PASSWORD,
-        decode_responses=True,
-        encoding="utf-8",
-        socket_connect_timeout=0.2,
-        socket_timeout=0.2,
-        retry_on_timeout=False,
-    )
+    fresh_client = FakeAsyncRedis()
 
     old_shared = redis_client_mod.redis_client
     old_branches = branches_mod.redis_client

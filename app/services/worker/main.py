@@ -15,6 +15,7 @@ from app.core.queue import (
     is_mode_fallback_redis,
     is_mode_legacy_redis_queue,
     save_run,
+    try_recover_redis,
 )
 from app.core.redis_client import redis_client
 from app.core.registry import policy_manager, tool_registry
@@ -51,7 +52,9 @@ policy_manager.set_allowlist("simulation.heavy", ["metrics"])
 
 async def update_heartbeat(worker_id: str):
     if is_mode_fallback_redis():
-        return
+        recovered = await try_recover_redis()
+        if not recovered:
+            return
 
     try:
         import json

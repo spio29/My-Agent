@@ -57,9 +57,24 @@ class _RedisTimeoutOnXreadgroup:
         raise RedisTimeoutError("socket timeout")
 
 
+class _RecoveringRedis:
+    def __init__(self):
+        self.ping_calls = 0
+        self.xgroup_create_calls = 0
+
+    async def ping(self):
+        self.ping_calls += 1
+        return True
+
+    async def xgroup_create(self, *args, **kwargs):
+        self.xgroup_create_calls += 1
+        return True
+
+
 def _reset_queue_fallback_state():
     queue.set_mode_fallback_redis(False)
     queue.set_mode_legacy_redis_queue(False)
+    queue._last_redis_recovery_attempt_monotonic = 0.0
     queue._fallback_stream.clear()
     queue._fallback_delayed.clear()
     queue._fallback_job_specs.clear()
@@ -211,6 +226,21 @@ def test_stream_dequeue_timeout_does_not_trigger_fallback(monkeypatch):
     assert row is None
     assert queue.is_mode_fallback_redis() is False
     assert queue.is_mode_legacy_redis_queue() is False
+
+
+def test_try_recover_redis_leaves_fallback_mode_when_redis_returns(monkeypatch):
+    _reset_queue_fallback_state()
+    redis_recover = _RecoveringRedis()
+    monkeypatch.setattr(queue, "redis_client", redis_recover)
+    queue.set_mode_fallback_redis(True)
+
+    recovered = asyncio.run(queue.try_recover_redis(force=True))
+
+    assert recovered is True
+    assert queue.is_mode_fallback_redis() is False
+    assert queue.is_mode_legacy_redis_queue() is False
+    assert redis_recover.ping_calls == 1
+    assert redis_recover.xgroup_create_calls == 1
 
 
 def test_active_runs_index_updates_in_fallback_mode(monkeypatch):

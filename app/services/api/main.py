@@ -132,6 +132,7 @@ from app.core.queue import (
     rollback_job_spec_to_version,
     save_job_spec,
     save_run,
+    is_mode_fallback_redis,
     set_mode_fallback_redis,
 )
 from app.core.scheduler import Scheduler
@@ -452,6 +453,22 @@ async def _is_redis_ready() -> bool:
         return True
     except Exception:
         return False
+
+
+async def _refresh_redis_runtime_state() -> bool:
+    redis_ready = await _is_redis_ready()
+    app.state.redis_ready = redis_ready
+    set_mode_fallback_redis(not redis_ready)
+
+    if not redis_ready:
+        return False
+
+    await init_queue()
+    redis_ready = not is_mode_fallback_redis()
+    app.state.redis_ready = redis_ready
+    if redis_ready and getattr(app.state, "local_mode", False):
+        await _stop_local_runtime()
+    return redis_ready
 
 
 def _local_agents_snapshot() -> List[Dict[str, Any]]:
@@ -1129,6 +1146,10 @@ async def _stop_local_runtime():
         if task:
             with suppress(asyncio.CancelledError, Exception):
                 await task
+        setattr(app.state, attr, None)
+
+    app.state.local_scheduler = None
+    app.state.local_mode = False
 
 
 @app.on_event("startup")
@@ -2325,6 +2346,7 @@ async def delete_skill_endpoint(skill_id: str):
 
 @app.get("/connectors")
 async def connectors():
+    await _refresh_redis_runtime_state()
     if not getattr(app.state, "redis_ready", True):
         return _fallback_payload("/connectors", [])
 
@@ -2357,6 +2379,7 @@ async def connectors():
 
 @app.get("/agents")
 async def agents():
+    await _refresh_redis_runtime_state()
     if not getattr(app.state, "redis_ready", True):
         return _fallback_payload("/agents", _local_agents_snapshot())
 

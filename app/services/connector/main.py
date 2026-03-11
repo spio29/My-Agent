@@ -16,7 +16,7 @@ from app.core.connector_accounts import (
     set_telegram_last_update_id,
 )
 from app.core.observability import logger
-from app.core.queue import append_event, is_mode_fallback_redis, set_mode_fallback_redis
+from app.core.queue import append_event, is_mode_fallback_redis, set_mode_fallback_redis, try_recover_redis
 from app.core.redis_client import redis_client
 from app.services.api.planner import PlannerRequest, build_plan_from_prompt
 from app.services.api.planner_ai import PlannerAiRequest, build_plan_with_ai_dari_dashboard
@@ -75,7 +75,9 @@ def _switch_fallback_redis(error: Exception) -> None:
 async def kirim_heartbeat_konektor(channel: str, account_id: str, status: str = "online"):
     """Update connector heartbeat in Redis."""
     if is_mode_fallback_redis():
-        return
+        recovered = await try_recover_redis()
+        if not recovered:
+            return
 
     key = f"{CONNECTOR_PREFIX}:{channel}:{account_id}"
     try:
@@ -89,8 +91,10 @@ async def pantau_konektor():
     while True:
         try:
             if is_mode_fallback_redis():
-                await asyncio.sleep(10)
-                continue
+                recovered = await try_recover_redis()
+                if not recovered:
+                    await asyncio.sleep(10)
+                    continue
 
             daftar_kunci = await redis_client.keys(f"{CONNECTOR_PREFIX}:*")
 

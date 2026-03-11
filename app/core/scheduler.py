@@ -22,6 +22,7 @@ from .queue import (
     get_job_spec,
     is_mode_fallback_redis,
     save_run,
+    try_recover_redis,
 )
 from .redis_client import redis_client
 
@@ -81,7 +82,9 @@ class Scheduler:
 
     async def heartbeat(self):
         if is_mode_fallback_redis():
-            return
+            recovered = await try_recover_redis()
+            if not recovered:
+                return
 
         try:
             await redis_client.setex(

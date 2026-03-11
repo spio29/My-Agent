@@ -3,9 +3,10 @@ import inspect
 import json
 import os
 import re
+import threading
 import urllib.error
 import urllib.request
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from pydantic import BaseModel, Field
 
@@ -123,21 +124,66 @@ def _get_planner_ai_semaphore() -> Tuple[asyncio.Semaphore, int]:
 
 
 def _defer_semaphore_release(
-    worker_task: "asyncio.Task[Any]",
+    worker_task: "asyncio.Future[Any]",
     semaphore: asyncio.Semaphore,
     grace_sec: float,
 ) -> None:
-    async def _wait_and_release() -> None:
-        try:
-            await asyncio.wait_for(asyncio.shield(worker_task), timeout=grace_sec)
-        except Exception:
-            pass
-        finally:
-            # Jika task backend menggantung terlalu lama, slot tetap dilepas setelah grace
-            # agar sistem tidak terkunci permanen di mode "busy".
-            semaphore.release()
+    loop = asyncio.get_running_loop()
+    released = False
 
-    asyncio.create_task(_wait_and_release())
+    def _release_once() -> None:
+        nonlocal released
+        if released:
+            return
+        released = True
+        semaphore.release()
+
+    def _handle_worker_done(_task: "asyncio.Task[Any]") -> None:
+        timeout_handle.cancel()
+        _release_once()
+
+    # Lepas slot segera saat worker background selesai.
+    worker_task.add_done_callback(_handle_worker_done)
+    # Tetap lepaskan slot setelah grace jika worker menggantung terlalu lama.
+    timeout_handle = loop.call_later(grace_sec, _release_once)
+
+
+def _jalankan_di_daemon_thread(
+    func: Callable[..., Any],
+    *args: Any,
+    **kwargs: Any,
+) -> "asyncio.Future[Any]":
+    loop = asyncio.get_running_loop()
+    future: "asyncio.Future[Any]" = loop.create_future()
+
+    def _set_result(result: Any) -> None:
+        if not future.done():
+            future.set_result(result)
+
+    def _set_exception(exc: BaseException) -> None:
+        if not future.done():
+            future.set_exception(exc)
+
+    def _runner() -> None:
+        try:
+            result = func(*args, **kwargs)
+        except BaseException as exc:  # pragma: no cover - background handoff
+            if loop.is_closed():
+                return
+            loop.call_soon_threadsafe(_set_exception, exc)
+            return
+
+        if loop.is_closed():
+            return
+        loop.call_soon_threadsafe(_set_result, result)
+
+    worker = threading.Thread(
+        target=_runner,
+        name="planner-ai-worker",
+        daemon=True,
+    )
+    worker.start()
+    return future
 
 
 def _normalisasi_teks(text: str) -> str:
@@ -1202,14 +1248,12 @@ async def build_plan_with_ai_dari_dashboard(request: PlannerAiRequest) -> Planne
                 ]
             )
 
-            worker_task: asyncio.Task[Any] = asyncio.create_task(
-                asyncio.to_thread(
-                    _jalankan_smolagents,
-                    request,
-                    model_id_override=kredensial.model_id,
-                    api_key_override=kredensial.api_key,
-                    api_base_override=kredensial.api_base,
-                )
+            worker_task = _jalankan_di_daemon_thread(
+                _jalankan_smolagents,
+                request,
+                model_id_override=kredensial.model_id,
+                api_key_override=kredensial.api_key,
+                api_base_override=kredensial.api_base,
             )
             try:
                 payload, warnings_ai = await asyncio.wait_for(

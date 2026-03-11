@@ -1,14 +1,13 @@
 import uuid
 
 import pytest
-import redis.asyncio as redis_async
 
 import app.core.queue as queue_mod
 import app.core.redis_client as redis_client_mod
 import app.core.triggers as triggers_mod
-from app.core.config import settings
 from app.core.queue import enable_job, save_job_spec
 from app.core.triggers import delete_trigger, fire_trigger, get_trigger, list_triggers, upsert_trigger
+from tests.fake_async_redis import FakeAsyncRedis
 
 
 @pytest.fixture
@@ -18,17 +17,7 @@ def anyio_backend():
 
 @pytest.fixture(autouse=True)
 async def _reset_redis_client_per_test():
-    fresh_client = redis_async.Redis(
-        host=settings.REDIS_HOST,
-        port=settings.REDIS_PORT,
-        db=settings.REDIS_DB,
-        password=settings.REDIS_PASSWORD,
-        decode_responses=True,
-        encoding="utf-8",
-        socket_connect_timeout=0.2,
-        socket_timeout=0.2,
-        retry_on_timeout=False,
-    )
+    fresh_client = FakeAsyncRedis()
 
     old_shared = redis_client_mod.redis_client
     old_queue = queue_mod.redis_client

@@ -22,10 +22,11 @@ const summarizeEvent = (type: string): string => {
   if (normalized.includes("telegram")) return "Notification lane updated";
   if (normalized.includes("auth") || normalized.includes("token")) return "Access updated";
   if (normalized.includes("approval")) return "Approval flow updated";
+  if (normalized.includes("integration")) return "Integration account updated";
   if (normalized.includes("settings") || normalized.includes("config")) return "Workspace setting updated";
 
   return type
-    .replace(/[_-]+/g, " ")
+    .replace(/[._-]+/g, " ")
     .replace(/\s+/g, " ")
     .trim()
     .replace(/\b\w/g, (char) => char.toUpperCase());
@@ -58,7 +59,7 @@ export default function SettingsPage() {
   });
   const eventsQuery = useQuery({
     queryKey: ["settings", "events"],
-    queryFn: () => getEvents({ limit: 8 }),
+    queryFn: () => getEvents({ limit: 40 }),
   });
 
   const refreshAll = async () => {
@@ -100,7 +101,7 @@ export default function SettingsPage() {
   const configurationEvents = useMemo(
     () =>
       (eventsQuery.data || []).filter((event) =>
-        /telegram|auth|token|settings|config|approval/.test(event.type),
+        /telegram|auth|token|settings|config|approval|integration/.test(event.type),
       ),
     [eventsQuery.data],
   );

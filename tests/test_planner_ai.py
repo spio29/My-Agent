@@ -494,6 +494,9 @@ def test_build_plan_with_ai_timeout_keeps_slot_busy_until_worker_done(monkeypatc
         second_latency = time.perf_counter() - start
 
         first_result = await first
+        # Planner timeout sengaja membiarkan worker thread selesai di background.
+        # Tunggu sebentar agar asyncio.run() tidak macet saat shutdown executor.
+        await asyncio.sleep(0.3)
         return first_result, second, second_latency
 
     try:
